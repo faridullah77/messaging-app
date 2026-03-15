@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-box">
+        <div class="login-logo">✨</div>
+        <h1>Create Account</h1>
+        <p class="subtitle">Join and start chatting</p>
+
+        <form method="POST" action="/signup">
+            <input
+                type="text"
+                name="username"
+                placeholder="Choose a username..."
+                autocomplete="off"
+                required
+                autofocus
+            />
+            <input
+                type="email"
+                name="email"
+                placeholder="Email address..."
+                autocomplete="off"
+                required
+            />
+            <input
+                type="password"
+                name="password"
+                placeholder="Choose a password..."
+                required
+            />
+            <button type="submit">Create Account →</button>
+        </form>
+
+        <p class="switch-auth">
+            Already have an account? <a href="/login">Login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

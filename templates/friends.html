@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Friends{% endblock %}
+
+{% block content %}
+<div class="app-container">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="avatar">{{ current_user.username[0].upper() }}</div>
+            <div class="user-info">
+                <span class="my-username">{{ current_user.username }}</span>
+                <span class="status">● Online</span>
+            </div>
+        </div>
+
+        <div class="sidebar-section-title">Friends</div>
+        <ul class="friend-list">
+            {% for friend in friends %}
+            <li class="friend-item" onclick="window.location='/chat/{{ friend.id }}'">
+                <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
+                <div class="friend-info">
+                    <span class="friend-name">{{ friend.username }}</span>
+                    <span class="friend-status {% if friend.is_online %}online{% else %}offline{% endif %}">
+                        {% if friend.is_online %}● Online{% else %}● Offline{% endif %}
+                    </span>
+                </div>
+            </li>
+            {% else %}
+            <li class="no-friends">No friends yet.<br>Search to add some!</li>
+            {% endfor %}
+        </ul>
+
+        <div class="sidebar-footer">
+            <a href="/logout" class="leave-btn">Logout</a>
+        </div>
+    </div>
+
+    <!-- Main Area -->
+    <div class="main-area">
+
+        <!-- Search Bar -->
+        <div class="search-section">
+            <h2>Find People</h2>
+            <div class="search-bar">
+                <input
+                    type="text"
+                    id="search-input"
+                    placeholder="Search by username..."
+                    autocomplete="off"
+                />
+            </div>
+            <ul id="search-results"></ul>
+        </div>
+
+        <!-- Pending Requests -->
+        {% if pending_requests %}
+        <div class="requests-section">
+            <h2>Friend Requests</h2>
+            {% for req in pending_requests %}
+            <div class="request-card">
+                <div class="request-avatar">{{ req.sender.username[0].upper() }}</div>
+                <div class="request-info">
+                    <span class="request-name">{{ req.sender.username }}</span>
+                    <span class="request-sub">wants to be your friend</span>
+                </div>
+                <div class="request-actions">
+                    <form method="POST" action="/accept_request/{{ req.id }}" style="display:inline">
+                        <button class="btn-accept">✓ Accept</button>
+                    </form>
+                    <form method="POST" action="/reject_request/{{ req.id }}" style="display:inline">
+                        <button class="btn-reject">✕ Reject</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Welcome Message -->
+        {% if not friends and not pending_requests %}
+        <div class="welcome-section">
+            <div class="welcome-icon">👋</div>
+            <h2>Welcome, {{ current_user.username }}!</h2>
+            <p>Search for people above to add them as friends and start chatting.</p>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const searchInput = document.getElementById('search-input');
+const searchResults = document.getElementById('search-results');
+
+let searchTimeout;
+
+searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    const query = searchInput.value.trim();
+    if (query.length < 1) {
+        searchResults.innerHTML = '';
+        return;
+    }
+    searchTimeout = setTimeout(() => {
+        fetch(`/search_users?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(users => {
+                searchResults.innerHTML = '';
+                if (users.length === 0) {
+                    searchResults.innerHTML = '<li class="no-results">No users found</li>';
+                    return;
+                }
+                users.forEach(user => {
+                    const li = document.createElement('li');
+                    li.classList.add('search-result-item');
+                    let actionBtn = '';
+                    if (user.is_friend) {
+                        actionBtn = `<button class="btn-chat" onclick="window.location='/chat/${user.id}'">💬 Chat</button>`;
+                    } else if (user.has_pending) {
+                        actionBtn = `<button class="btn-pending" disabled>Pending...</button>`;
+                    } else {
+                        actionBtn = `<button class="btn-add" onclick="sendRequest(${user.id}, this)">+ Add Friend</button>`;
+                    }
+                    li.innerHTML = `
+                        <div class="result-avatar">${user.username[0].toUpperCase()}</div>
+                        <div class="result-info">
+                            <span class="result-name">${user.username}</span>
+                            <span class="result-status ${user.is_online ? 'online' : 'offline'}">
+                                ${user.is_online ? '● Online' : '● Offline'}
+                            </span>
+                        </div>
+                        ${actionBtn}
+                    `;
+                    searchResults.appendChild(li);
+                });
+            });
+    }, 300);
+});
+
+function sendRequest(userId, btn) {
+    fetch(`/send_request/${userId}`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                btn.textContent = 'Pending...';
+                btn.disabled = true;
+                btn.className = 'btn-pending';
+            }
+        });
+}
+</script>
+{% endblock %}
