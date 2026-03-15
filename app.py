@@ -195,7 +195,8 @@ def handle_message(data):
     emit('receive_message', payload, room=f'user_{receiver_id}')
     emit('receive_message', payload, room=f'user_{current_user.id}')
 
+with app.app_context():
+    db.create_all()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     socketio.run(app, debug=True)
