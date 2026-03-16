@@ -96,11 +96,18 @@ def friends():
     pending_requests = FriendRequest.query.filter_by(
         receiver_id=current_user.id, status='pending'
     ).all()
+    unread_counts = {}
+    for friend in friends_list:
+        count = Message.query.filter_by(
+            sender_id=friend.id,
+            receiver_id=current_user.id,
+            is_read=False
+        ).count()
+        unread_counts[friend.id] = count
     return render_template('friends.html',
                            friends=friends_list,
                            pending_requests=pending_requests,
                            unread_counts=unread_counts)
-
 @app.route('/search_users')
 @login_required
 def search_users():
