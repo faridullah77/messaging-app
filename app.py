@@ -207,7 +207,8 @@ def handle_message(data):
     msg = Message(
         sender_id=current_user.id,
         receiver_id=receiver_id,
-        content=content
+        content=content,
+        is_read=False
     )
     db.session.add(msg)
     db.session.commit()
@@ -215,13 +216,25 @@ def handle_message(data):
         'message': content,
         'sender': current_user.username,
         'sender_id': current_user.id,
-        'timestamp': msg.timestamp.strftime('%H:%M')
+        'timestamp': msg.timestamp.strftime('%H:%M'),
+        'msg_id': msg.id,
+        'is_read': False
     }
     emit('receive_message', payload, room=f'user_{receiver_id}')
     emit('receive_message', payload, room=f'user_{current_user.id}')
-
 with app.app_context():
     db.create_all()
+
+@socketio.on('message_seen')
+def handle_message_seen(data):
+    if not current_user.is_authenticated:
+        return
+    msg_id = data.get('msg_id')
+    msg = Message.query.get(msg_id)
+    if msg and msg.receiver_id == current_user.id:
+        msg.is_read = True
+        db.session.commit()
+        emit('message_read', {'msg_id': msg_id}, room=f'user_{msg.sender_id}')
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

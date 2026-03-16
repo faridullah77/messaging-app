@@ -30,29 +30,25 @@
     </div>
 
     <!-- Chat Area -->
-    <div class="chat-area">
-        <div class="messages-container" id="messages">
-            {% for msg in messages %}
-            <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %}">
-                {% if msg.sender_id != current_user.id %}
-                <span class="message-sender">{{ friend.username }}</span>
-                {% endif %}
-                <div class="message-bubble">{{ msg.content }}</div>
-                <span class="message-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
-            </div>
-            {% endfor %}
-        </div>
-        <div class="input-area">
-            <input
-                type="text"
-                id="message-input"
-                placeholder="Type a message..."
-                autocomplete="off"
-            />
-            <button id="send-btn">Send</button>
+    <div class="messages-container" id="messages">
+    {% for msg in messages %}
+    <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %}"
+         data-msg-id="{{ msg.id }}">
+        {% if msg.sender_id != current_user.id %}
+        <span class="message-sender">{{ friend.username }}</span>
+        {% endif %}
+        <div class="message-bubble">{{ msg.content }}</div>
+        <div class="message-meta">
+            <span class="message-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
+            {% if msg.sender_id == current_user.id %}
+            <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}">
+                {% if msg.is_read %}✓✓{% else %}✓{% endif %}
+            </span>
+            {% endif %}
         </div>
     </div>
-
+    {% endfor %}
+</div>
 </div>
 {% endblock %}
 

@@ -806,3 +806,20 @@ body {
         display: none;
     }
 }
+/* ── Message Ticks ── */
+.message-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    padding: 0 4px;
+}
+
+.tick {
+    font-size: 11px;
+    color: #666;
+}
+
+.tick.seen {
+    color: #6c63ff;
+}

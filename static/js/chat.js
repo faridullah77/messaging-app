@@ -7,6 +7,11 @@ const messagesContainer = document.getElementById('messages');
 // ── Scroll to bottom on load ──
 scrollToBottom();
 
+// ── Mark existing messages as seen ──
+document.querySelectorAll('.message.theirs[data-msg-id]').forEach(el => {
+    socket.emit('message_seen', { msg_id: parseInt(el.dataset.msgId) });
+});
+
 // ── Send Message ──
 function sendMessage() {
     const message = messageInput.value.trim();
@@ -20,7 +25,6 @@ function sendMessage() {
 }
 
 sendBtn.addEventListener('click', sendMessage);
-
 messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
@@ -51,17 +55,31 @@ socket.on('receive_message', (data) => {
 
     if (!isMine) {
         playNotificationSound();
+        socket.emit('message_seen', { msg_id: data.msg_id });
     }
 
     const msgEl = document.createElement('div');
     msgEl.classList.add('message', isMine ? 'mine' : 'theirs');
+    if (data.msg_id) msgEl.dataset.msgId = data.msg_id;
     msgEl.innerHTML = `
         ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
         <div class="message-bubble">${escapeHtml(data.message)}</div>
-        <span class="message-time">${data.timestamp}</span>
+        <div class="message-meta">
+            <span class="message-time">${data.timestamp}</span>
+            ${isMine ? `<span class="tick" id="tick-${data.msg_id}">✓</span>` : ''}
+        </div>
     `;
     messagesContainer.appendChild(msgEl);
     scrollToBottom();
+});
+
+// ── Message Read (ticks turn blue) ──
+socket.on('message_read', (data) => {
+    const tick = document.getElementById(`tick-${data.msg_id}`);
+    if (tick) {
+        tick.textContent = '✓✓';
+        tick.classList.add('seen');
+    }
 });
 
 // ── Helpers ──
