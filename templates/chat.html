@@ -12,10 +12,9 @@
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <div class="avatar">{{ current_user.username[0].upper() }}</div>
-            <div class="user-info">
-                <span class="my-username">{{ current_user.username }}</span>
-                <span class="status">● Online</span>
+            <div class="sidebar-actions">
+                <a href="/friends" class="leave-btn">← Back</a>
+                <a href="/logout" class="leave-btn logout">Logout</a>
             </div>
         </div>
 
@@ -28,11 +27,6 @@
                     {% if friend.is_online %}● Online{% else %}● Offline{% endif %}
                 </span>
             </div>
-        </div>
-
-        <div class="sidebar-footer">
-            <a href="/friends" class="leave-btn">← Back to Friends</a>
-            <a href="/logout" class="leave-btn" style="margin-top:8px">Logout</a>
         </div>
     </div>
 

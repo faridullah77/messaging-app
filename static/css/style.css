@@ -770,3 +770,39 @@ body {
     justify-content: center;
     padding: 0 4px;
 }
+/* ── Chat Sidebar Mobile Fix ── */
+.sidebar-actions {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.sidebar-actions .leave-btn {
+    flex: 1;
+    padding: 10px;
+}
+
+.sidebar-actions .logout {
+    background: #2a2a2a;
+}
+
+@media (max-width: 768px) {
+    .sidebar-header {
+        padding: 12px 16px;
+    }
+
+    .chat-area {
+        height: calc(100vh - 140px) !important;
+    }
+
+    .messages-container {
+        padding: 12px 16px;
+    }
+
+    /* Hide own username in chat sidebar on mobile */
+    .chat-area .my-username,
+    .chat-area .status,
+    .chat-area .avatar {
+        display: none;
+    }
+}
