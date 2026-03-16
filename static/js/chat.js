@@ -25,13 +25,32 @@ messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') sendMessage();
 });
 
+// ── Notification Sound ──
+function playNotificationSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.3);
+    } catch(e) {
+        console.log('Sound not supported');
+    }
+}
+
 // ── Receive Message ──
 socket.on('receive_message', (data) => {
     const isMine = data.sender_id === CURRENT_USER_ID;
 
-    // avoid duplicate if sender
-    if (isMine && data.sender_id === CURRENT_USER_ID) {
-        // only append if it came from server (not optimistic)
+    if (!isMine) {
+        playNotificationSound();
     }
 
     const msgEl = document.createElement('div');

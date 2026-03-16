@@ -17,7 +17,6 @@
                 <a href="/logout" class="leave-btn logout">Logout</a>
             </div>
         </div>
-
         <div class="sidebar-section-title">Chatting With</div>
         <div class="active-friend">
             <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
@@ -32,15 +31,6 @@
 
     <!-- Chat Area -->
     <div class="chat-area">
-        <div class="chat-header">
-            <div class="chat-header-info">
-                <span class="chat-header-name">{{ friend.username }}</span>
-                <span class="chat-header-status {% if friend.is_online %}online{% else %}offline{% endif %}">
-                    {% if friend.is_online %}● Online{% else %}● Offline{% endif %}
-                </span>
-            </div>
-        </div>
-
         <div class="messages-container" id="messages">
             {% for msg in messages %}
             <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %}">
@@ -52,7 +42,6 @@
             </div>
             {% endfor %}
         </div>
-
         <div class="input-area">
             <input
                 type="text"
