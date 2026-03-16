@@ -98,7 +98,8 @@ def friends():
     ).all()
     return render_template('friends.html',
                            friends=friends_list,
-                           pending_requests=pending_requests)
+                           pending_requests=pending_requests,
+                           unread_counts=unread_counts)
 
 @app.route('/search_users')
 @login_required
