@@ -156,6 +156,13 @@ def chat(friend_id):
     friend = User.query.get_or_404(friend_id)
     if not current_user.is_friend_with(friend):
         return redirect(url_for('friends'))
+    # Mark all messages from friend as read
+    Message.query.filter_by(
+        sender_id=friend_id,
+        receiver_id=current_user.id,
+        is_read=False
+    ).update({'is_read': True})
+    db.session.commit()
     messages = Message.query.filter(
         ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
         ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id))
@@ -164,7 +171,6 @@ def chat(friend_id):
                            friend=friend,
                            messages=messages,
                            current_user=current_user)
-
 # ── Socket Events ──
 @socketio.on('connect')
 def handle_connect():

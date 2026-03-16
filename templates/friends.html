@@ -19,14 +19,17 @@
         <ul class="friend-list">
             {% for friend in friends %}
             <li class="friend-item" onclick="window.location='/chat/{{ friend.id }}'">
-                <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
-                <div class="friend-info">
-                    <span class="friend-name">{{ friend.username }}</span>
-                    <span class="friend-status {% if friend.is_online %}online{% else %}offline{% endif %}">
-                        {% if friend.is_online %}● Online{% else %}● Offline{% endif %}
-                    </span>
-                </div>
-            </li>
+    <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
+    <div class="friend-info">
+        <span class="friend-name">{{ friend.username }}</span>
+        <span class="friend-status {% if friend.is_online %}online{% else %}offline{% endif %}">
+            {% if friend.is_online %}● Online{% else %}● Offline{% endif %}
+        </span>
+    </div>
+    {% if unread_counts[friend.id] > 0 %}
+    <div class="unread-badge">{{ unread_counts[friend.id] }}</div>
+    {% endif %}
+</li>
             {% else %}
             <li class="no-friends">No friends yet.<br>Search to add some!</li>
             {% endfor %}
