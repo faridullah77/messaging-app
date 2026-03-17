@@ -67,6 +67,7 @@ socket.on('receive_message', (data) => {
         <div class="message-meta">
             <span class="message-time">${data.timestamp}</span>
             ${isMine ? `<span class="tick" id="tick-${data.msg_id}">✓</span>` : ''}
+            ${isMine ? `<span class="delete-btn" onclick="deleteMessage(${data.msg_id}, this)">🗑️</span>` : ''}
         </div>
     `;
     messagesContainer.appendChild(msgEl);
@@ -81,6 +82,22 @@ socket.on('message_read', (data) => {
         tick.classList.add('seen');
     }
 });
+
+// ── Delete Message ──
+function deleteMessage(msgId, btn) {
+    if (!confirm('Delete this message?')) return;
+    fetch(`/delete_message/${msgId}`, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const msgEl = btn.closest('.message');
+                msgEl.querySelector('.message-bubble').textContent = 'Message deleted';
+                msgEl.querySelector('.message-bubble').style.opacity = '0.4';
+                msgEl.querySelector('.message-bubble').style.fontStyle = 'italic';
+                btn.remove();
+            }
+        });
+}
 
 // ── Helpers ──
 function scrollToBottom() {

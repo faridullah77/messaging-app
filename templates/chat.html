@@ -1,10 +1,14 @@
 {% extends "base.html" %}
+
 {% block title %}Chat with {{ friend.username }}{% endblock %}
+
 {% block head %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
 {% endblock %}
+
 {% block content %}
 <div class="app-container">
+
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
@@ -27,15 +31,6 @@
 
     <!-- Chat Area -->
     <div class="chat-area">
-        <div class="chat-header">
-            <div class="chat-header-info">
-                <span class="chat-header-name">{{ friend.username }}</span>
-                <span class="chat-header-status {% if friend.is_online %}online{% else %}offline{% endif %}">
-                    {% if friend.is_online %}● Online{% else %}● Offline{% endif %}
-                </span>
-            </div>
-        </div>
-
         <div class="messages-container" id="messages">
             {% for msg in messages %}
             <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %}"
@@ -50,20 +45,27 @@
                     <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}">
                         {% if msg.is_read %}✓✓{% else %}✓{% endif %}
                     </span>
+                    <span class="delete-btn" onclick="deleteMessage({{ msg.id }}, this)">🗑️</span>
                     {% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
 
-        <!-- Input Area -->
         <div class="input-area">
-            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off" />
+            <input
+                type="text"
+                id="message-input"
+                placeholder="Type a message..."
+                autocomplete="off"
+            />
             <button id="send-btn">Send</button>
         </div>
     </div>
+
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script>
     const CURRENT_USER_ID = {{ current_user.id }};

@@ -823,3 +823,22 @@ body {
 .tick.seen {
     color: #6c63ff;
 }
+/* ── Delete Button ── */
+.delete-btn {
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    margin-left: 4px;
+}
+
+.message:hover .delete-btn {
+    opacity: 1;
+}
+
+/* Show delete btn on mobile (always visible) */
+@media (max-width: 768px) {
+    .delete-btn {
+        opacity: 1;
+    }
+}

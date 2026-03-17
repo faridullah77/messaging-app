@@ -179,6 +179,15 @@ def chat(friend_id):
                            friend=friend,
                            messages=messages,
                            current_user=current_user)
+@app.route('/delete_message/<int:msg_id>', methods=['POST'])
+@login_required
+def delete_message(msg_id):
+    msg = Message.query.get_or_404(msg_id)
+    if msg.sender_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    db.session.delete(msg)
+    db.session.commit()
+    return jsonify({'success': True})
 # ── Socket Events ──
 @socketio.on('connect')
 def handle_connect():
