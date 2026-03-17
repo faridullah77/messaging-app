@@ -6,4 +6,4 @@ flask-sqlalchemy
 flask-login
 werkzeug
 psycopg2-binary
-flask-migrate
+flask-migrat
