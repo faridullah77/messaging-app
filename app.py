@@ -6,7 +6,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, FriendRequest, Message
+from models import db, User, FriendRequest, Message, Reaction
 from datetime import datetime
 
 app = Flask(__name__)
@@ -14,7 +14,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey123')
 
 database_url = os.environ.get('DATABASE_URL', '')
 print(f"DATABASE_URL found: {bool(database_url)}")
-
 if not database_url:
     database_url = 'postgresql://localhost/messaging_app'
 if database_url.startswith('postgres://'):
@@ -22,6 +21,7 @@ if database_url.startswith('postgres://'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db.init_app(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 login_manager = LoginManager(app)
@@ -108,6 +108,7 @@ def friends():
                            friends=friends_list,
                            pending_requests=pending_requests,
                            unread_counts=unread_counts)
+
 @app.route('/search_users')
 @login_required
 def search_users():
@@ -164,7 +165,6 @@ def chat(friend_id):
     friend = User.query.get_or_404(friend_id)
     if not current_user.is_friend_with(friend):
         return redirect(url_for('friends'))
-    # Mark all messages from friend as read
     Message.query.filter_by(
         sender_id=friend_id,
         receiver_id=current_user.id,
@@ -179,15 +179,72 @@ def chat(friend_id):
                            friend=friend,
                            messages=messages,
                            current_user=current_user)
+
+# ── Search Messages ──
+@app.route('/search_messages/<int:friend_id>')
+@login_required
+def search_messages(friend_id):
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify([])
+    messages = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
+        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id)),
+        Message.content.ilike(f'%{query}%'),
+        Message.is_deleted == False
+    ).order_by(Message.timestamp.asc()).all()
+    results = []
+    for msg in messages:
+        results.append({
+            'id': msg.id,
+            'content': msg.content,
+            'sender_id': msg.sender_id,
+            'timestamp': msg.timestamp.strftime('%H:%M')
+        })
+    return jsonify(results)
+
+# ── Delete Message ──
 @app.route('/delete_message/<int:msg_id>', methods=['POST'])
 @login_required
 def delete_message(msg_id):
     msg = Message.query.get_or_404(msg_id)
     if msg.sender_id != current_user.id:
         return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    db.session.delete(msg)
-    db.session.commit()
+    delete_for = request.json.get('delete_for', 'me') if request.json else 'me'
+    if delete_for == 'everyone':
+        msg.content = 'This message was deleted'
+        msg.is_deleted = True
+        db.session.commit()
+        other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+        socketio.emit('message_deleted', {'msg_id': msg_id}, room=f'user_{other_id}')
+        socketio.emit('message_deleted', {'msg_id': msg_id}, room=f'user_{current_user.id}')
+    else:
+        msg.is_deleted = True
+        db.session.commit()
     return jsonify({'success': True})
+
+# ── Reactions ──
+@app.route('/react/<int:msg_id>', methods=['POST'])
+@login_required
+def react_message(msg_id):
+    emoji = request.json.get('emoji')
+    if not emoji:
+        return jsonify({'success': False})
+    existing = Reaction.query.filter_by(
+        message_id=msg_id,
+        user_id=current_user.id,
+        emoji=emoji
+    ).first()
+    if existing:
+        db.session.delete(existing)
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'removed'})
+    Reaction.query.filter_by(message_id=msg_id, user_id=current_user.id).delete()
+    reaction = Reaction(message_id=msg_id, user_id=current_user.id, emoji=emoji)
+    db.session.add(reaction)
+    db.session.commit()
+    return jsonify({'success': True, 'action': 'added'})
+
 # ── Socket Events ──
 @socketio.on('connect')
 def handle_connect():
@@ -208,6 +265,7 @@ def handle_message(data):
         return
     receiver_id = data.get('receiver_id')
     content = data.get('message', '').strip()
+    reply_to_id = data.get('reply_to_id')
     if not content or not receiver_id:
         return
     receiver = User.query.get(receiver_id)
@@ -217,22 +275,30 @@ def handle_message(data):
         sender_id=current_user.id,
         receiver_id=receiver_id,
         content=content,
-        is_read=False
+        is_read=False,
+        reply_to_id=reply_to_id
     )
     db.session.add(msg)
     db.session.commit()
+    reply_preview = None
+    if reply_to_id:
+        reply_msg = Message.query.get(reply_to_id)
+        if reply_msg:
+            reply_preview = {
+                'content': reply_msg.content[:50],
+                'sender_id': reply_msg.sender_id
+            }
     payload = {
         'message': content,
         'sender': current_user.username,
         'sender_id': current_user.id,
         'timestamp': msg.timestamp.strftime('%H:%M'),
         'msg_id': msg.id,
-        'is_read': False
+        'is_read': False,
+        'reply_preview': reply_preview
     }
     emit('receive_message', payload, room=f'user_{receiver_id}')
     emit('receive_message', payload, room=f'user_{current_user.id}')
-with app.app_context():
-    db.create_all()
 
 @socketio.on('message_seen')
 def handle_message_seen(data):
@@ -244,6 +310,61 @@ def handle_message_seen(data):
         msg.is_read = True
         db.session.commit()
         emit('message_read', {'msg_id': msg_id}, room=f'user_{msg.sender_id}')
+
+@socketio.on('send_reaction')
+def handle_reaction(data):
+    if not current_user.is_authenticated:
+        return
+    msg_id = data.get('msg_id')
+    emoji = data.get('emoji')
+    msg = Message.query.get(msg_id)
+    if not msg:
+        return
+    existing = Reaction.query.filter_by(
+        message_id=msg_id,
+        user_id=current_user.id
+    ).first()
+    if existing:
+        if existing.emoji == emoji:
+            db.session.delete(existing)
+            db.session.commit()
+        else:
+            existing.emoji = emoji
+            db.session.commit()
+    else:
+        reaction = Reaction(message_id=msg_id, user_id=current_user.id, emoji=emoji)
+        db.session.add(reaction)
+        db.session.commit()
+    reactions = Reaction.query.filter_by(message_id=msg_id).all()
+    result = {}
+    for r in reactions:
+        result[r.emoji] = result.get(r.emoji, 0) + 1
+    other_user_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+    payload = {'msg_id': msg_id, 'reactions': result}
+    emit('reaction_updated', payload, room=f'user_{current_user.id}')
+    emit('reaction_updated', payload, room=f'user_{other_user_id}')
+
+@socketio.on('typing')
+def handle_typing(data):
+    if not current_user.is_authenticated:
+        return
+    receiver_id = data.get('receiver_id')
+    emit('user_typing', {
+        'sender': current_user.username,
+        'sender_id': current_user.id
+    }, room=f'user_{receiver_id}')
+
+@socketio.on('stop_typing')
+def handle_stop_typing(data):
+    if not current_user.is_authenticated:
+        return
+    receiver_id = data.get('receiver_id')
+    emit('user_stop_typing', {
+        'sender_id': current_user.id
+    }, room=f'user_{receiver_id}')
+
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

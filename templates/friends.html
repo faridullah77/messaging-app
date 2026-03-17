@@ -18,7 +18,7 @@
         <div class="sidebar-section-title">Friends</div>
         <ul class="friend-list">
             {% for friend in friends %}
-            <li class="friend-item" onclick="window.location='/chat/{{ friend.id }}'">
+            <li class="friend-item" data-friend-id="{{ friend.id }}" onclick="window.location='/chat/{{ friend.id }}'">
     <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
     <div class="friend-info">
         <span class="friend-name">{{ friend.username }}</span>
