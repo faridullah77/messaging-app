@@ -705,7 +705,38 @@ body {
 /* ── Emoji Reactions ── */
 .message-bubble-wrap {
     position: relative;
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.reaction-trigger {
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 16px;
+    cursor: pointer;
+    background: #fff;
+    border: 1px solid #e9edef;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    flex-shrink: 0;
+}
+
+.message:hover .reaction-trigger {
+    opacity: 1;
+}
+
+.mine .reaction-trigger {
+    order: -1;
+}
+
+@media (max-width: 768px) {
+    .reaction-trigger { opacity: 1; }
 }
 
 .emoji-picker {

@@ -137,9 +137,10 @@ socket.on('receive_message', (data) => {
     msgEl.innerHTML = `
         ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
         ${replyHtml}
-        <div class="message-bubble-wrap">
+       <div class="message-bubble-wrap">
+            <button class="reaction-trigger" onclick="togglePicker(${data.msg_id}, this)">😊</button>
             <div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>
-            <div class="emoji-picker" data-msg-id="${data.msg_id}">
+            <div class="emoji-picker" id="picker-${data.msg_id}" data-msg-id="${data.msg_id}">
                 <span onclick="sendReaction(${data.msg_id}, '❤️')">❤️</span>
                 <span onclick="sendReaction(${data.msg_id}, '😂')">😂</span>
                 <span onclick="sendReaction(${data.msg_id}, '😮')">😮</span>
@@ -293,6 +294,13 @@ socket.on('message_edited', (data) => {
 });
 
 // ── Emoji Reactions ──
+function togglePicker(msgId, btn) {
+    const picker = document.getElementById(`picker-${msgId}`);
+    const isShown = picker.classList.contains('show');
+    document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
+    if (!isShown) picker.classList.add('show');
+}
+
 function sendReaction(msgId, emoji) {
     socket.emit('send_reaction', { msg_id: msgId, emoji: emoji });
     document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
@@ -310,34 +318,12 @@ socket.on('reaction_updated', (data) => {
     }
 });
 
-// ── Hover emoji picker ──
-document.addEventListener('mouseover', (e) => {
-    const bubble = e.target.closest('.message-bubble-wrap');
-    if (bubble) {
+// ── Close picker when clicking outside ──
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.message-bubble-wrap')) {
         document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
-        bubble.querySelector('.emoji-picker')?.classList.add('show');
     }
 });
-
-document.addEventListener('mouseout', (e) => {
-    const bubble = e.target.closest('.message-bubble-wrap');
-    if (bubble) {
-        bubble.querySelector('.emoji-picker')?.classList.remove('show');
-    }
-});
-
-// ── Long press mobile ──
-let pressTimer;
-document.addEventListener('touchstart', (e) => {
-    const bubble = e.target.closest('.message-bubble-wrap');
-    if (bubble) {
-        pressTimer = setTimeout(() => {
-            document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
-            bubble.querySelector('.emoji-picker')?.classList.add('show');
-        }, 500);
-    }
-});
-document.addEventListener('touchend', () => clearTimeout(pressTimer));
 
 // ── Search Messages ──
 function toggleSearch() {
