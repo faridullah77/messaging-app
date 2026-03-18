@@ -10,7 +10,8 @@ from models import db, User, FriendRequest, Message, Reaction
 from datetime import datetime
 from flask_mail import Mail, Message as MailMessage
 from itsdangerous import URLSafeTimedSerializer
-
+import cloudinary
+import cloudinary.uploader
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey123')
 
@@ -33,6 +34,12 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_EMAIL')
 
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
+# ── Cloudinary Config ──
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET')
+)
 
 db.init_app(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -306,6 +313,49 @@ def reset_password(token):
             flash('Password reset ho gaya! Ab login karo.')
             return redirect(url_for('login'))
     return render_template('reset_password.html', token=token)
+# ── Image Upload ──
+@app.route('/upload_image', methods=['POST'])
+@login_required
+def upload_image():
+    if 'image' not in request.files:
+        return jsonify({'success': False, 'error': 'No image'})
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'})
+    try:
+        result = cloudinary.uploader.upload(
+            file,
+            folder='messaging_app',
+            allowed_formats=['jpg', 'jpeg', 'png', 'gif', 'webp'],
+            max_bytes=5000000
+        )
+        image_url = result['secure_url']
+        receiver_id = request.form.get('receiver_id', type=int)
+        receiver = User.query.get(receiver_id)
+        if not receiver or not current_user.is_friend_with(receiver):
+            return jsonify({'success': False, 'error': 'Unauthorized'})
+        msg = Message(
+            sender_id=current_user.id,
+            receiver_id=receiver_id,
+            content=f'[IMAGE]{image_url}[/IMAGE]',
+            is_read=False
+        )
+        db.session.add(msg)
+        db.session.commit()
+        payload = {
+            'message': f'[IMAGE]{image_url}[/IMAGE]',
+            'sender': current_user.username,
+            'sender_id': current_user.id,
+            'timestamp': msg.timestamp.strftime('%H:%M'),
+            'msg_id': msg.id,
+            'is_read': False,
+            'reply_preview': None
+        }
+        socketio.emit('receive_message', payload, room=f'user_{receiver_id}')
+        socketio.emit('receive_message', payload, room=f'user_{current_user.id}')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 # ── Socket Events ──
 @socketio.on('connect')

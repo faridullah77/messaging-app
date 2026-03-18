@@ -1128,3 +1128,39 @@ body.light-mode .sidebar-section-title { color: #999; }
 body.light-mode .message-time { color: #999; }
 body.light-mode .reply-quote { background: #e8e8e8; color: #555; }
 body.light-mode .reaction-pill { background: #f0f0f0; border-color: #e0e0e0; }
+/* ── Image Upload ── */
+.image-upload-btn {
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 8px;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.image-upload-btn:hover {
+    background: #2a2a2a;
+}
+
+.chat-image {
+    max-width: 250px;
+    max-height: 250px;
+    border-radius: 12px;
+    cursor: pointer;
+    object-fit: cover;
+    transition: opacity 0.2s;
+    display: block;
+    margin: 4px 0;
+}
+
+.chat-image:hover {
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .chat-image {
+        max-width: 180px;
+        max-height: 180px;
+    }
+}

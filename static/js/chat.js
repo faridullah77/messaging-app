@@ -7,6 +7,47 @@ let currentReplyId = null;
 let currentDeleteMsgId = null;
 let typingTimeout;
 
+// ── Image Upload ──
+document.getElementById('image-input')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5000000) {
+        alert('Image 5MB se badi nahi honi chahiye!');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('receiver_id', FRIEND_ID);
+
+    // Show uploading indicator
+    const uploadingEl = document.createElement('div');
+    uploadingEl.classList.add('message', 'mine');
+    uploadingEl.innerHTML = `
+        <div class="message-bubble" style="opacity:0.6">
+            📷 Uploading...
+        </div>
+    `;
+    messagesContainer.appendChild(uploadingEl);
+    scrollToBottom();
+
+    fetch('/upload_image', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        uploadingEl.remove();
+        if (!data.success) {
+            alert('Upload failed: ' + data.error);
+        }
+        e.target.value = '';
+    })
+    .catch(() => {
+        uploadingEl.remove();
+        alert('Upload failed!');
+    });
+});
+
 // ── Scroll to bottom on load ──
 scrollToBottom();
 
@@ -97,7 +138,7 @@ socket.on('receive_message', (data) => {
         ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
         ${replyHtml}
         <div class="message-bubble-wrap">
-            <div class="message-bubble">${escapeHtml(data.message)}</div>
+            <div class="message-bubble">${renderContent(data.message)}</div>
             <div class="emoji-picker" data-msg-id="${data.msg_id}">
                 <span onclick="sendReaction(${data.msg_id}, '❤️')">❤️</span>
                 <span onclick="sendReaction(${data.msg_id}, '😂')">😂</span>
@@ -292,6 +333,14 @@ if (localStorage.getItem('theme') === 'light') {
 // ── Helpers ──
 function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+// ── Render Message Content (text ya image) ──
+function renderContent(content) {
+    if (content.startsWith('[IMAGE]') && content.endsWith('[/IMAGE]')) {
+        const url = content.slice(7, -8);
+        return `<img src="${url}" class="chat-image" onclick="window.open('${url}', '_blank')" />`;
+    }
+    return escapeHtml(content);
 }
 
 function escapeHtml(text) {

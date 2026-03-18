@@ -9,3 +9,4 @@ psycopg2-binary
 flask-migrate
 flask-mail
 itsdangerous
+cloudinary

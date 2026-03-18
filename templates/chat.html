@@ -65,7 +65,11 @@
                 </div>
                 {% endif %}
                 <div class="message-bubble-wrap">
-                    <div class="message-bubble">{{ msg.content }}</div>
+                    {% if '[IMAGE]' in msg.content %}
+<img src="{{ msg.content[7:-8] }}" class="chat-image" onclick="window.open('{{ msg.content[7:-8] }}', '_blank')" />
+{% else %}
+<div class="message-bubble">{{ msg.content }}</div>
+{% endif %}
                     {% if not msg.is_deleted %}
                     <div class="emoji-picker" data-msg-id="{{ msg.id }}">
                         <span onclick="sendReaction({{ msg.id }}, '❤️')">❤️</span>
@@ -99,6 +103,10 @@
         <div class="input-area">
             <button class="search-toggle-btn" onclick="toggleSearch()" title="Search messages">🔍</button>
             <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+            <label class="image-upload-btn" title="Image bhejo">
+                📷
+                <input type="file" id="image-input" accept="image/*" style="display:none"/>
+            </label>
             <input
                 type="text"
                 id="message-input"
