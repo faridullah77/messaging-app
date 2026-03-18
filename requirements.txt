@@ -10,3 +10,4 @@ flask-migrate
 flask-mail
 itsdangerous
 cloudinary
+pywebpush

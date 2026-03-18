@@ -6,12 +6,14 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, FriendRequest, Message, Reaction
+from models import db, User, FriendRequest, Message, Reaction, PushSubscription
 from datetime import datetime
 from flask_mail import Mail, Message as MailMessage
 from itsdangerous import URLSafeTimedSerializer
 import cloudinary
 import cloudinary.uploader
+from pywebpush import webpush, WebPushException
+import json
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey123')
 
@@ -40,6 +42,10 @@ cloudinary.config(
     api_key=os.environ.get('CLOUDINARY_API_KEY'),
     api_secret=os.environ.get('CLOUDINARY_API_SECRET')
 )
+# ── VAPID Config ──
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_EMAIL = os.environ.get('VAPID_EMAIL', 'mailto:test@test.com')
 
 db.init_app(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -375,13 +381,50 @@ def edit_message(msg_id):
     other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
     socketio.emit('message_edited', {
         'msg_id': msg_id,
-        'new_content': new_content
+        'new_content': new_contenimport cloudinary
+import cloudinary.uploadert
     }, room=f'user_{other_id}')
     socketio.emit('message_edited', {
         'msg_id': msg_id,
         'new_content': new_content
     }, room=f'user_{current_user.id}')
     return jsonify({'success': True})
+# ── Push Notifications ──
+@app.route('/get_vapid_public_key')
+def get_vapid_public_key():
+    return jsonify({'public_key': VAPID_PUBLIC_KEY})
+
+@app.route('/save_subscription', methods=['POST'])
+@login_required
+def save_subscription():
+    subscription = request.json
+    if not subscription:
+        return jsonify({'success': False})
+    # Delete old subscriptions for this user
+    PushSubscription.query.filter_by(user_id=current_user.id).delete()
+    sub = PushSubscription(
+        user_id=current_user.id,
+        subscription_json=json.dumps(subscription)
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return jsonify({'success': True})
+
+def send_push_notification(user_id, title, body):
+    subscriptions = PushSubscription.query.filter_by(user_id=user_id).all()
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info=json.loads(sub.subscription_json),
+                data=json.dumps({'title': title, 'body': body}),
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={'sub': VAPID_EMAIL}
+            )
+        except WebPushException as e:
+            print(f"Push notification failed: {e}")
+            if '410' in str(e):
+                db.session.delete(sub)
+                db.session.commit()
 
 # ── Socket Events ──
 @socketio.on('connect')
@@ -438,6 +481,15 @@ def handle_message(data):
     }
     emit('receive_message', payload, room=f'user_{receiver_id}')
     emit('receive_message', payload, room=f'user_{current_user.id}')
+    # Send push notification to receiver
+    try:
+        send_push_notification(
+            receiver_id,
+            f'New message from {current_user.username}',
+            content[:100]
+        )
+    except Exception as e:
+        print(f"Push notification error: {e}")
 
 @socketio.on('message_seen')
 def handle_message_seen(data):
