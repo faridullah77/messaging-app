@@ -7,6 +7,30 @@ let currentReplyId = null;
 let currentDeleteMsgId = null;
 let typingTimeout;
 
+// ── Scroll to bottom on load ──
+scrollToBottom();
+
+// ── Convert UTC to Local Time ──
+function formatLocalTime(utcString) {
+    const date = new Date(utcString + 'Z');
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+// ── Convert existing messages time on page load ──
+document.querySelectorAll('.message-time[data-utc]').forEach(el => {
+    el.textContent = formatLocalTime(el.dataset.utc);
+});
+
+// ── Convert last seen time ──
+document.querySelectorAll('.last-seen-time[data-utc]').forEach(el => {
+    el.textContent = formatLocalTime(el.dataset.utc);
+});
+
+// ── Mark existing messages as seen ──
+document.querySelectorAll('.message.theirs[data-msg-id]').forEach(el => {
+    socket.emit('message_seen', { msg_id: parseInt(el.dataset.msgId) });
+});
+
 // ── Image Upload ──
 document.getElementById('image-input')?.addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -19,41 +43,23 @@ document.getElementById('image-input')?.addEventListener('change', (e) => {
     formData.append('image', file);
     formData.append('receiver_id', FRIEND_ID);
 
-    // Show uploading indicator
     const uploadingEl = document.createElement('div');
     uploadingEl.classList.add('message', 'mine');
-    uploadingEl.innerHTML = `
-        <div class="message-bubble" style="opacity:0.6">
-            📷 Uploading...
-        </div>
-    `;
+    uploadingEl.innerHTML = `<div class="message-bubble" style="opacity:0.6">📷 Uploading...</div>`;
     messagesContainer.appendChild(uploadingEl);
     scrollToBottom();
 
-    fetch('/upload_image', {
-        method: 'POST',
-        body: formData
-    })
+    fetch('/upload_image', { method: 'POST', body: formData })
     .then(res => res.json())
     .then(data => {
         uploadingEl.remove();
-        if (!data.success) {
-            alert('Upload failed: ' + data.error);
-        }
+        if (!data.success) alert('Upload failed: ' + data.error);
         e.target.value = '';
     })
     .catch(() => {
         uploadingEl.remove();
         alert('Upload failed!');
     });
-});
-
-// ── Scroll to bottom on load ──
-scrollToBottom();
-
-// ── Mark existing messages as seen ──
-document.querySelectorAll('.message.theirs[data-msg-id]').forEach(el => {
-    socket.emit('message_seen', { msg_id: parseInt(el.dataset.msgId) });
 });
 
 // ── Send Message ──
@@ -137,17 +143,14 @@ socket.on('receive_message', (data) => {
     msgEl.innerHTML = `
         ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
         ${replyHtml}
-       <div class="message-bubble-wrap">
-            <button class="reaction-trigger d-desktop-only" onclick="togglePicker(${data.msg_id}, this)">😊</button>
-            <div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>
-            <div class="emoji-picker" id="picker-${data.msg_id}" data-msg-id="${data.msg_id}">
-                <span onclick="sendReaction(${data.msg_id}, '❤️')">❤️</span>
-                <span onclick="sendReaction(${data.msg_id}, '😂')">😂</span>
-                <span onclick="sendReaction(${data.msg_id}, '😮')">😮</span>
-                <span onclick="sendReaction(${data.msg_id}, '😢')">😢</span>
-                <span onclick="sendReaction(${data.msg_id}, '👍')">👍</span>
-                <span onclick="sendReaction(${data.msg_id}, '🔥')">🔥</span>
-            </div>
+        <div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>
+        <div class="emoji-picker" id="picker-${data.msg_id}">
+            <span onclick="sendReaction(${data.msg_id}, '❤️')">❤️</span>
+            <span onclick="sendReaction(${data.msg_id}, '😂')">😂</span>
+            <span onclick="sendReaction(${data.msg_id}, '😮')">😮</span>
+            <span onclick="sendReaction(${data.msg_id}, '😢')">😢</span>
+            <span onclick="sendReaction(${data.msg_id}, '👍')">👍</span>
+            <span onclick="sendReaction(${data.msg_id}, '🔥')">🔥</span>
         </div>
         <div class="reactions-bar" id="reactions-${data.msg_id}"></div>
         <div class="message-meta">
@@ -183,8 +186,8 @@ socket.on('message_deleted', (data) => {
         }
         const picker = msgEl.querySelector('.emoji-picker');
         if (picker) picker.remove();
-        const deletBtn = msgEl.querySelector('.delete-btn');
-        if (deletBtn) deletBtn.remove();
+        const deleteBtn = msgEl.querySelector('.delete-btn');
+        if (deleteBtn) deleteBtn.remove();
     }
 });
 
@@ -239,17 +242,16 @@ function cancelReply() {
     currentReplyId = null;
     document.getElementById('reply-preview').style.display = 'none';
 }
+
 // ── Edit Message ──
 function startEdit(msgId, currentContent) {
     const bubble = document.getElementById(`bubble-${msgId}`);
     if (!bubble) return;
-
-    const originalContent = currentContent;
     bubble.innerHTML = `
         <input type="text" class="edit-input" id="edit-input-${msgId}" value="${escapeHtml(currentContent)}" />
         <div class="edit-actions">
-            <button onclick="saveEdit(${msgId}, '${escapeHtml(originalContent)}')" class="btn-save-edit">✓ Save</button>
-            <button onclick="cancelEdit(${msgId}, '${escapeHtml(originalContent)}')" class="btn-cancel-edit">✕ Cancel</button>
+            <button onclick="saveEdit(${msgId}, '${escapeHtml(currentContent)}')" class="btn-save-edit">✓ Save</button>
+            <button onclick="cancelEdit(${msgId}, '${escapeHtml(currentContent)}')" class="btn-cancel-edit">✕ Cancel</button>
         </div>
     `;
     document.getElementById(`edit-input-${msgId}`).focus();
@@ -260,7 +262,6 @@ function saveEdit(msgId, originalContent) {
     if (!input) return;
     const newContent = input.value.trim();
     if (!newContent) return;
-
     fetch(`/edit_message/${msgId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -270,9 +271,7 @@ function saveEdit(msgId, originalContent) {
     .then(data => {
         if (data.success) {
             const bubble = document.getElementById(`bubble-${msgId}`);
-            if (bubble) {
-                bubble.innerHTML = `${escapeHtml(newContent)} <span class="edited-tag">(edited)</span>`;
-            }
+            if (bubble) bubble.innerHTML = `${escapeHtml(newContent)} <span class="edited-tag">(edited)</span>`;
         } else {
             cancelEdit(msgId, originalContent);
         }
@@ -281,26 +280,15 @@ function saveEdit(msgId, originalContent) {
 
 function cancelEdit(msgId, originalContent) {
     const bubble = document.getElementById(`bubble-${msgId}`);
-    if (bubble) {
-        bubble.innerHTML = escapeHtml(originalContent);
-    }
+    if (bubble) bubble.innerHTML = escapeHtml(originalContent);
 }
 
 socket.on('message_edited', (data) => {
     const bubble = document.getElementById(`bubble-${data.msg_id}`);
-    if (bubble) {
-        bubble.innerHTML = `${escapeHtml(data.new_content)} <span class="edited-tag">(edited)</span>`;
-    }
+    if (bubble) bubble.innerHTML = `${escapeHtml(data.new_content)} <span class="edited-tag">(edited)</span>`;
 });
 
 // ── Emoji Reactions ──
-function togglePicker(msgId, btn) {
-    const picker = document.getElementById(`picker-${msgId}`);
-    const isShown = picker.classList.contains('show');
-    document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
-    if (!isShown) picker.classList.add('show');
-}
-
 function sendReaction(msgId, emoji) {
     socket.emit('send_reaction', { msg_id: msgId, emoji: emoji });
     document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
@@ -318,9 +306,59 @@ socket.on('reaction_updated', (data) => {
     }
 });
 
+// ── Show emoji picker on hover (desktop) ──
+document.addEventListener('mouseover', (e) => {
+    const msg = e.target.closest('.message');
+    if (msg && !e.target.closest('.emoji-picker')) {
+        const msgId = msg.dataset.msgId;
+        const picker = document.getElementById(`picker-${msgId}`);
+        if (picker) {
+            document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
+            picker.classList.add('show');
+        }
+    }
+});
+
+document.addEventListener('mouseout', (e) => {
+    const msg = e.target.closest('.message');
+    if (msg && !msg.contains(e.relatedTarget)) {
+        const msgId = msg.dataset.msgId;
+        const picker = document.getElementById(`picker-${msgId}`);
+        if (picker) picker.classList.remove('show');
+    }
+});
+
+// ── Long press mobile ──
+let pressTimer;
+let touchMoved = false;
+
+document.addEventListener('touchstart', (e) => {
+    touchMoved = false;
+    const msg = e.target.closest('.message');
+    if (msg && !e.target.closest('.emoji-picker')) {
+        pressTimer = setTimeout(() => {
+            if (!touchMoved) {
+                const msgId = msg.dataset.msgId;
+                const picker = document.getElementById(`picker-${msgId}`);
+                if (picker) {
+                    document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
+                    picker.classList.add('show');
+                }
+            }
+        }, 500);
+    }
+}, { passive: true });
+
+document.addEventListener('touchmove', () => {
+    touchMoved = true;
+    clearTimeout(pressTimer);
+}, { passive: true });
+
+document.addEventListener('touchend', () => clearTimeout(pressTimer), { passive: true });
+
 // ── Close picker when clicking outside ──
 document.addEventListener('click', (e) => {
-    if (!e.target.closest('.message-bubble-wrap')) {
+    if (!e.target.closest('.message') && !e.target.closest('.emoji-picker')) {
         document.querySelectorAll('.emoji-picker').forEach(p => p.classList.remove('show'));
     }
 });
@@ -329,9 +367,7 @@ document.addEventListener('click', (e) => {
 function toggleSearch() {
     const bar = document.getElementById('chat-search-bar');
     bar.style.display = bar.style.display === 'none' ? 'flex' : 'none';
-    if (bar.style.display === 'flex') {
-        document.getElementById('chat-search-input').focus();
-    }
+    if (bar.style.display === 'flex') document.getElementById('chat-search-input').focus();
 }
 
 function closeSearch() {
@@ -364,27 +400,16 @@ function toggleTheme() {
     localStorage.setItem('theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
 }
 
-// Load saved theme
 if (localStorage.getItem('theme') === 'light') {
     document.body.classList.add('light-mode');
     document.querySelector('.theme-toggle-btn').textContent = '☀️';
 }
-// ── Convert UTC to Local Time ──
-function formatLocalTime(utcString) {
-    const date = new Date(utcString + 'Z');
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-}
-
-// ── Convert existing messages time on page load ──
-document.querySelectorAll('.message-time[data-utc]').forEach(el => {
-    el.textContent = formatLocalTime(el.dataset.utc);
-});
 
 // ── Helpers ──
 function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
-// ── Render Message Content (text ya image) ──
+
 function renderContent(content) {
     if (content.startsWith('[IMAGE]') && content.endsWith('[/IMAGE]')) {
         const url = content.slice(7, -8);

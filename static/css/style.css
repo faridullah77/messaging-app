@@ -482,22 +482,46 @@ html, body {
 .emoji-picker {
     display: none;
     position: absolute;
-    top: -44px;
-    left: 0;
+    top: 0;
+    left: 105%;
     background: #fff;
     border: 1px solid #e9edef;
     border-radius: 20px;
-    padding: 4px 8px;
+    padding: 6px 10px;
     gap: 4px;
-    z-index: 100;
+    z-index: 200;
     white-space: nowrap;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
 }
 
 .emoji-picker.show { display: flex; }
-.mine .emoji-picker { left: auto; right: 0; }
-.emoji-picker span { cursor: pointer; font-size: 18px; padding: 2px 4px; border-radius: 8px; transition: transform 0.1s; }
+
+.mine .emoji-picker {
+    left: auto;
+    right: 105%;
+}
+
+.emoji-picker span {
+    cursor: pointer;
+    font-size: 20px;
+    padding: 2px 4px;
+    border-radius: 8px;
+    transition: transform 0.1s;
+}
+
 .emoji-picker span:hover { transform: scale(1.3); }
+
+@media (max-width: 768px) {
+    .emoji-picker {
+        position: fixed;
+        bottom: 100px;
+        left: 50% !important;
+        right: auto !important;
+        top: auto !important;
+        transform: translateX(-50%);
+        z-index: 9000;
+    }
+}
 
 /* ── Reactions Bar ── */
 .reactions-bar { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }

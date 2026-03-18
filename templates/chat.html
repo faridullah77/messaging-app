@@ -62,52 +62,52 @@
             </div>
         </div>
 
-<div class="messages-container" id="messages">
-    {% for msg in messages %}
-    <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %} {% if msg.is_deleted %}deleted{% endif %}"
-         data-msg-id="{{ msg.id }}">
-        {% if msg.sender_id != current_user.id %}
-        <span class="message-sender">{{ friend.username }}</span>
-        {% endif %}
-        {% if msg.reply_to %}
-        <div class="reply-quote">
-            <span>{{ msg.reply_to.content[:50] }}</span>
+        <div class="messages-container" id="messages">
+            {% for msg in messages %}
+            <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %} {% if msg.is_deleted %}deleted{% endif %}"
+                 data-msg-id="{{ msg.id }}">
+                {% if msg.sender_id != current_user.id %}
+                <span class="message-sender">{{ friend.username }}</span>
+                {% endif %}
+                {% if msg.reply_to %}
+                <div class="reply-quote">
+                    <span>{{ msg.reply_to.content[:50] }}</span>
+                </div>
+                {% endif %}
+                {% if '[IMAGE]' in msg.content %}
+                <img src="{{ msg.content[7:-8] }}" class="chat-image" onclick="window.open('{{ msg.content[7:-8] }}', '_blank')" />
+                {% else %}
+                <div class="message-bubble" id="bubble-{{ msg.id }}">{{ msg.content }}{% if msg.is_edited %} <span class="edited-tag">(edited)</span>{% endif %}</div>
+                {% endif %}
+                {% if not msg.is_deleted %}
+                <div class="emoji-picker" id="picker-{{ msg.id }}">
+                    <span onclick="sendReaction({{ msg.id }}, '❤️')">❤️</span>
+                    <span onclick="sendReaction({{ msg.id }}, '😂')">😂</span>
+                    <span onclick="sendReaction({{ msg.id }}, '😮')">😮</span>
+                    <span onclick="sendReaction({{ msg.id }}, '😢')">😢</span>
+                    <span onclick="sendReaction({{ msg.id }}, '👍')">👍</span>
+                    <span onclick="sendReaction({{ msg.id }}, '🔥')">🔥</span>
+                </div>
+                {% endif %}
+                <div class="reactions-bar" id="reactions-{{ msg.id }}"></div>
+                <div class="message-meta">
+                    <span class="message-time" data-utc="{{ msg.timestamp.isoformat() }}"></span>
+                    {% if msg.sender_id == current_user.id %}
+                    <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}">
+                        {% if msg.is_read %}✓✓{% else %}✓{% endif %}
+                    </span>
+                    {% if not msg.is_deleted %}
+                    <span class="edit-btn" onclick="startEdit({{ msg.id }}, '{{ msg.content|replace("'", "\\'") }}')">✏️</span>
+                    <span class="delete-btn" onclick="showDeleteOptions({{ msg.id }}, this)">🗑️</span>
+                    {% endif %}
+                    {% endif %}
+                    {% if not msg.is_deleted %}
+                    <span class="reply-btn" onclick="setReply({{ msg.id }}, '{{ msg.content[:50]|replace("'", "\\'") }}')">↩️</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        {% endif %}
-        {% if '[IMAGE]' in msg.content %}
-        <img src="{{ msg.content[7:-8] }}" class="chat-image" onclick="window.open('{{ msg.content[7:-8] }}', '_blank')" />
-        {% else %}
-        <div class="message-bubble" id="bubble-{{ msg.id }}">{{ msg.content }}{% if msg.is_edited %} <span class="edited-tag">(edited)</span>{% endif %}</div>
-        {% endif %}
-        {% if not msg.is_deleted %}
-        <div class="emoji-picker" id="picker-{{ msg.id }}" data-msg-id="{{ msg.id }}">
-            <span onclick="sendReaction({{ msg.id }}, '❤️')">❤️</span>
-            <span onclick="sendReaction({{ msg.id }}, '😂')">😂</span>
-            <span onclick="sendReaction({{ msg.id }}, '😮')">😮</span>
-            <span onclick="sendReaction({{ msg.id }}, '😢')">😢</span>
-            <span onclick="sendReaction({{ msg.id }}, '👍')">👍</span>
-            <span onclick="sendReaction({{ msg.id }}, '🔥')">🔥</span>
-        </div>
-        {% endif %}
-        <div class="reactions-bar" id="reactions-{{ msg.id }}"></div>
-        <div class="message-meta">
-            <span class="message-time" data-utc="{{ msg.timestamp.isoformat() }}"></span>
-            {% if msg.sender_id == current_user.id %}
-            <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}">
-                {% if msg.is_read %}✓✓{% else %}✓{% endif %}
-            </span>
-            {% if not msg.is_deleted %}
-            <span class="edit-btn" onclick="startEdit({{ msg.id }}, '{{ msg.content|replace("'", "\\'") }}')">✏️</span>
-            <span class="delete-btn" onclick="showDeleteOptions({{ msg.id }}, this)">🗑️</span>
-            {% endif %}
-            {% endif %}
-            {% if not msg.is_deleted %}
-            <span class="reply-btn" onclick="setReply({{ msg.id }}, '{{ msg.content[:50]|replace("'", "\\'") }}')">↩️</span>
-            {% endif %}
-        </div>
-    </div>
-    {% endfor %}
-</div>
 
         <div class="input-area">
             <button class="search-toggle-btn" onclick="toggleSearch()" title="Search messages">🔍</button>
@@ -122,7 +122,7 @@
                 placeholder="Type a message..."
                 autocomplete="off"
             />
-           <button id="send-btn">▶</button>
+            <button id="send-btn">▶</button>
         </div>
     </div>
 
