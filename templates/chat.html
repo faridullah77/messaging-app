@@ -89,7 +89,7 @@
                 </div>
                 <div class="reactions-bar" id="reactions-{{ msg.id }}"></div>
                 <div class="message-meta">
-                    <span class="message-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
+                    <span class="message-time" data-utc="{{ msg.timestamp.isoformat() }}"></span>
                     {% if msg.sender_id == current_user.id %}
                     <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}">
                         {% if msg.is_read %}✓✓{% else %}✓{% endif %}

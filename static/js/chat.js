@@ -150,7 +150,7 @@ socket.on('receive_message', (data) => {
         </div>
         <div class="reactions-bar" id="reactions-${data.msg_id}"></div>
         <div class="message-meta">
-            <span class="message-time">${data.timestamp}</span>
+            <span class="message-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
             ${isMine ? `<span class="tick" id="tick-${data.msg_id}">✓</span>` : ''}
             ${isMine ? `<span class="edit-btn" onclick="startEdit(${data.msg_id}, '${escapeHtml(data.message).replace(/'/g, "\\'")}')">✏️</span>` : ''}
             ${isMine ? `<span class="delete-btn" onclick="showDeleteOptions(${data.msg_id}, this)">🗑️</span>` : ''}
@@ -383,6 +383,16 @@ if (localStorage.getItem('theme') === 'light') {
     document.body.classList.add('light-mode');
     document.querySelector('.theme-toggle-btn').textContent = '☀️';
 }
+// ── Convert UTC to Local Time ──
+function formatLocalTime(utcString) {
+    const date = new Date(utcString + 'Z');
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+// ── Convert existing messages time on page load ──
+document.querySelectorAll('.message-time[data-utc]').forEach(el => {
+    el.textContent = formatLocalTime(el.dataset.utc);
+});
 
 // ── Helpers ──
 function scrollToBottom() {
