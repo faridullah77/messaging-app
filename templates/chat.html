@@ -77,7 +77,15 @@
                     <span>{{ msg.reply_to.content[:50] }}</span>
                 </div>
                 {% endif %}
-                {% if '[IMAGE]' in msg.content %}
+                {% if msg.content == '[VIEW_ONCE_VIEWED]' %}
+                <div class="view-once-viewed">👁️ Viewed</div>
+                {% elif msg.view_once and msg.sender_id != current_user.id and not msg.viewed %}
+                <div class="view-once-tap" onclick="viewOnceImage({{ msg.id }}, this)">
+                    👁️ Tap to view (view once)
+                </div>
+                {% elif msg.view_once and msg.sender_id == current_user.id %}
+                <div class="view-once-sent">👁️ View once {% if msg.viewed %}• Viewed{% else %}• Not viewed yet{% endif %}</div>
+                {% elif '[IMAGE]' in msg.content %}
                 <img src="{{ msg.content[7:-8] }}" class="chat-image" onclick="window.open('{{ msg.content[7:-8] }}', '_blank')" />
                 {% else %}
                 <div class="message-bubble" id="bubble-{{ msg.id }}">{{ msg.content }}{% if msg.is_edited %} <span class="edited-tag">(edited)</span>{% endif %}</div>
@@ -115,9 +123,13 @@
         <div class="input-area">
             <button class="search-toggle-btn" onclick="toggleSearch()" title="Search messages">🔍</button>
             <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
-            <label class="image-upload-btn" title="Image bhejo">
+           <label class="image-upload-btn" title="Normal image bhejo">
                 📷
                 <input type="file" id="image-input" accept="image/*" style="display:none"/>
+            </label>
+            <label class="image-upload-btn view-once-btn" title="View once image bhejo">
+                👁️
+                <input type="file" id="view-once-input" accept="image/*" style="display:none"/>
             </label>
             <input
                 type="text"

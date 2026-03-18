@@ -341,11 +341,13 @@ def upload_image():
         receiver = User.query.get(receiver_id)
         if not receiver or not current_user.is_friend_with(receiver):
             return jsonify({'success': False, 'error': 'Unauthorized'})
+        view_once = request.form.get('view_once') == 'true'
         msg = Message(
             sender_id=current_user.id,
             receiver_id=receiver_id,
             content=f'[IMAGE]{image_url}[/IMAGE]',
-            is_read=False
+            is_read=False,
+            view_once=view_once
         )
         db.session.add(msg)
         db.session.commit()
@@ -356,7 +358,8 @@ def upload_image():
             'timestamp': msg.timestamp.strftime('%H:%M'),
             'msg_id': msg.id,
             'is_read': False,
-            'reply_preview': None
+            'reply_preview': None,
+            'view_once': view_once
         }
         socketio.emit('receive_message', payload, room=f'user_{receiver_id}')
         socketio.emit('receive_message', payload, room=f'user_{current_user.id}')
@@ -459,6 +462,23 @@ def update_bio():
     current_user.bio = bio
     db.session.commit()
     return jsonify({'success': True})
+# ── View Once ──
+@app.route('/view_once/<int:msg_id>', methods=['POST'])
+@login_required
+def view_once_image(msg_id):
+    msg = Message.query.get_or_404(msg_id)
+    if msg.receiver_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Unauthorized'})
+    if msg.view_once and not msg.viewed:
+        msg.viewed = True
+        msg.content = '[VIEW_ONCE_VIEWED]'
+        db.session.commit()
+        # Notify sender
+        other_id = msg.sender_id
+        socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{other_id}')
+        socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{current_user.id}')
+        return jsonify({'success': True})
+    return jsonify({'success': False})
 
 # ── Socket Events ──
 @socketio.on('connect')

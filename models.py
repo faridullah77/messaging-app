@@ -61,6 +61,8 @@ class Message(db.Model):
     is_read = db.Column(db.Boolean, default=False)
     is_deleted = db.Column(db.Boolean, default=False)
     is_edited = db.Column(db.Boolean, default=False)
+    view_once = db.Column(db.Boolean, default=False)
+    viewed = db.Column(db.Boolean, default=False)
     reply_to_id = db.Column(db.Integer, db.ForeignKey('messages.id'), nullable=True)
     reply_to = db.relationship('Message', remote_side=[id], backref='replies')
 

@@ -61,6 +61,73 @@ document.getElementById('image-input')?.addEventListener('change', (e) => {
         alert('Upload failed!');
     });
 });
+// ── View Once Upload ──
+document.getElementById('view-once-input')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5000000) {
+        alert('Image 5MB se badi nahi honi chahiye!');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('receiver_id', FRIEND_ID);
+    formData.append('view_once', 'true');
+
+    const uploadingEl = document.createElement('div');
+    uploadingEl.classList.add('message', 'mine');
+    uploadingEl.innerHTML = `<div class="message-bubble" style="opacity:0.6">👁️ Uploading view once...</div>`;
+    messagesContainer.appendChild(uploadingEl);
+    scrollToBottom();
+
+    fetch('/upload_image', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        uploadingEl.remove();
+        if (!data.success) alert('Upload failed: ' + data.error);
+        e.target.value = '';
+    })
+    .catch(() => {
+        uploadingEl.remove();
+        alert('Upload failed!');
+    });
+});
+
+// ── View Once - Tap to view ──
+function viewOnceImage(msgId, el) {
+    const msgEl = el.closest('.message');
+    const url = el.dataset.url;
+
+    // Show image in fullscreen
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;';
+    overlay.innerHTML = `
+        <p style="color:#fff;font-size:13px;opacity:0.7;">👁️ View Once — will disappear after closing</p>
+        <img src="${el.dataset.url}" style="max-width:90vw;max-height:80vh;border-radius:12px;object-fit:contain;"/>
+        <button onclick="closeViewOnce(${msgId}, this.closest('div[style]'))" 
+                style="padding:10px 24px;border-radius:24px;border:none;background:#25d366;color:#fff;font-size:14px;cursor:pointer;">
+            Close
+        </button>
+    `;
+    document.body.appendChild(overlay);
+
+    // Mark as viewed
+    fetch(`/view_once/${msgId}`, { method: 'POST' });
+}
+
+function closeViewOnce(msgId, overlay) {
+    overlay.remove();
+}
+
+socket.on('view_once_viewed', (data) => {
+    const msgEl = document.querySelector(`[data-msg-id="${data.msg_id}"]`);
+    if (msgEl) {
+        const viewOnce = msgEl.querySelector('.view-once-tap, .view-once-sent');
+        if (viewOnce) {
+            viewOnce.outerHTML = '<div class="view-once-viewed">👁️ Viewed</div>';
+        }
+    }
+});
 
 // ── Send Message ──
 function sendMessage() {
@@ -143,7 +210,12 @@ socket.on('receive_message', (data) => {
     msgEl.innerHTML = `
         ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
         ${replyHtml}
-        <div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>
+       ${data.view_once && !isMine ?
+            `<div class="view-once-tap" data-url="${data.message.slice(7,-8)}" onclick="viewOnceImage(${data.msg_id}, this)">👁️ Tap to view (view once)</div>` :
+            data.view_once && isMine ?
+            `<div class="view-once-sent">👁️ View once • Not viewed yet</div>` :
+            `<div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>`
+        }
         <div class="emoji-picker" id="picker-${data.msg_id}">
             <span onclick="sendReaction(${data.msg_id}, '❤️')">❤️</span>
             <span onclick="sendReaction(${data.msg_id}, '😂')">😂</span>
