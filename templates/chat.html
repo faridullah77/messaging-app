@@ -26,6 +26,9 @@
             {% endif %}
             <div class="friend-info">
                 <span class="friend-name">{{ friend.username }}</span>
+                {% if friend.bio %}
+                <span class="friend-bio">{{ friend.bio }}</span>
+                {% endif %}
                 <span class="friend-status {% if friend.is_online %}online{% else %}offline{% endif %}">
                     {% if friend.is_online %}
                         ● Online

@@ -941,3 +941,30 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
         right: auto;
     }
 }
+/* ── Bio ── */
+.my-bio {
+    font-size: 11px;
+    color: #667781;
+    cursor: pointer;
+    margin-top: 2px;
+    display: block;
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: color 0.2s;
+}
+
+.my-bio:hover {
+    color: #128c7e;
+}
+
+.friend-bio {
+    font-size: 11px;
+    color: #667781;
+    display: block;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

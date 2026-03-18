@@ -12,6 +12,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(256), nullable=False)
     is_online = db.Column(db.Boolean, default=False)
     avatar_url = db.Column(db.String(500), nullable=True)
+    bio = db.Column(db.String(150), nullable=True)
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

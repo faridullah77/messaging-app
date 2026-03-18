@@ -22,6 +22,9 @@
             <div class="user-info">
                 <span class="my-username">{{ current_user.username }}</span>
                 <span class="status">● Online</span>
+                <span class="my-bio" id="my-bio-text" onclick="editBio()">
+                    {{ current_user.bio if current_user.bio else '+ Add bio' }}
+                </span>
             </div>
         </div>
 
@@ -258,5 +261,42 @@ document.getElementById('avatar-input')?.addEventListener('change', (e) => {
         e.target.value = '';
     });
 });
+// ── Bio Edit ──
+function editBio() {
+    const bioEl = document.getElementById('my-bio-text');
+    const currentBio = bioEl.textContent.trim() === '+ Add bio' ? '' : bioEl.textContent.trim();
+    bioEl.innerHTML = `
+        <input type="text" id="bio-input" value="${currentBio}" 
+               maxlength="150" placeholder="Apni bio likho..."
+               style="width:100%;font-size:11px;padding:2px 6px;border-radius:6px;border:1px solid #25d366;outline:none;"/>
+    `;
+    const input = document.getElementById('bio-input');
+    input.focus();
+    input.addEventListener('blur', saveBio);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveBio();
+        if (e.key === 'Escape') {
+            bioEl.textContent = currentBio || '+ Add bio';
+        }
+    });
+}
+
+function saveBio() {
+    const input = document.getElementById('bio-input');
+    if (!input) return;
+    const bio = input.value.trim();
+    fetch('/update_bio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bio: bio })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const bioEl = document.getElementById('my-bio-text');
+        if (data.success) {
+            bioEl.textContent = bio || '+ Add bio';
+        }
+    });
+}
 </script>
 {% endblock %}

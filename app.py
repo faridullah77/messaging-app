@@ -449,6 +449,16 @@ def upload_avatar():
         return jsonify({'success': True, 'avatar_url': current_user.avatar_url})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+    # ── Update Bio ──
+@app.route('/update_bio', methods=['POST'])
+@login_required
+def update_bio():
+    bio = request.json.get('bio', '').strip()
+    if len(bio) > 150:
+        return jsonify({'success': False, 'error': 'Bio 150 characters se zyada nahi ho sakti'})
+    current_user.bio = bio
+    db.session.commit()
+    return jsonify({'success': True})
 
 # ── Socket Events ──
 @socketio.on('connect')
