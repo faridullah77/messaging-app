@@ -1080,3 +1080,42 @@ body.light-mode .reply-preview { background: #202c33; }
 body.light-mode .reply-preview-content { background: #2a3942; }
 body.light-mode .modal-box p { color: #e9edef; }
 body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
+/* ── Avatar / DP ── */
+.avatar-wrapper {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.avatar-img {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #25d366;
+}
+
+.friend-avatar-img {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #25d366;
+    flex-shrink: 0;
+}
+
+.avatar-upload-label {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    background: #25d366;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    border: 1px solid #fff;
+}

@@ -425,6 +425,30 @@ def send_push_notification(user_id, title, body):
             if '410' in str(e):
                 db.session.delete(sub)
                 db.session.commit()
+# ── Upload Avatar ──
+@app.route('/upload_avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    if 'avatar' not in request.files:
+        return jsonify({'success': False, 'error': 'No image'})
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'})
+    try:
+        result = cloudinary.uploader.upload(
+            file,
+            folder='farasma_avatars',
+            allowed_formats=['jpg', 'jpeg', 'png', 'webp'],
+            max_bytes=2000000,
+            transformation=[
+                {'width': 200, 'height': 200, 'crop': 'fill', 'gravity': 'face'}
+            ]
+        )
+        current_user.avatar_url = result['secure_url']
+        db.session.commit()
+        return jsonify({'success': True, 'avatar_url': current_user.avatar_url})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 # ── Socket Events ──
 @socketio.on('connect')

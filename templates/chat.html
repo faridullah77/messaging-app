@@ -19,7 +19,11 @@
         </div>
         <div class="sidebar-section-title">Chatting With</div>
         <div class="active-friend">
+            {% if friend.avatar_url %}
+            <img src="{{ friend.avatar_url }}" class="friend-avatar-img"/>
+            {% else %}
             <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
+            {% endif %}
             <div class="friend-info">
                 <span class="friend-name">{{ friend.username }}</span>
                 <span class="friend-status {% if friend.is_online %}online{% else %}offline{% endif %}">
