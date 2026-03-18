@@ -561,8 +561,8 @@ body {
 }
 
 ..input-area button#send-btn {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     border: none;
     background: #25d366;
