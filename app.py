@@ -103,6 +103,7 @@ def signup():
 @login_required
 def logout():
     current_user.is_online = False
+    current_user.last_seen = datetime.utcnow()
     db.session.commit()
     logout_user()
     return redirect(url_for('login'))
@@ -369,6 +370,7 @@ def handle_connect():
 def handle_disconnect():
     if current_user.is_authenticated:
         current_user.is_online = False
+        current_user.last_seen = datetime.utcnow()
         db.session.commit()
 
 @socketio.on('send_message')

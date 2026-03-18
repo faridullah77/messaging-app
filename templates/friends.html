@@ -23,7 +23,13 @@
     <div class="friend-info">
         <span class="friend-name">{{ friend.username }}</span>
         <span class="friend-status {% if friend.is_online %}online{% else %}offline{% endif %}">
-            {% if friend.is_online %}● Online{% else %}● Offline{% endif %}
+            {% if friend.is_online %}
+                ● Online
+            {% elif friend.last_seen %}
+                {{ friend.last_seen.strftime('%I:%M %p') }}
+            {% else %}
+                ● Offline
+            {% endif %}
         </span>
     </div>
     {% if unread_counts[friend.id] > 0 %}
