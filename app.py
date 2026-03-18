@@ -357,6 +357,31 @@ def upload_image():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+    # ── Edit Message ──
+@app.route('/edit_message/<int:msg_id>', methods=['POST'])
+@login_required
+def edit_message(msg_id):
+    msg = Message.query.get_or_404(msg_id)
+    if msg.sender_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    if msg.is_deleted:
+        return jsonify({'success': False, 'error': 'Deleted message edit nahi ho sakta'})
+    new_content = request.json.get('content', '').strip()
+    if not new_content:
+        return jsonify({'success': False, 'error': 'Empty message'})
+    msg.content = new_content
+    msg.is_edited = True
+    db.session.commit()
+    other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+    socketio.emit('message_edited', {
+        'msg_id': msg_id,
+        'new_content': new_content
+    }, room=f'user_{other_id}')
+    socketio.emit('message_edited', {
+        'msg_id': msg_id,
+        'new_content': new_content
+    }, room=f'user_{current_user.id}')
+    return jsonify({'success': True})
 
 # ── Socket Events ──
 @socketio.on('connect')

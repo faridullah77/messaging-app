@@ -138,7 +138,7 @@ socket.on('receive_message', (data) => {
         ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
         ${replyHtml}
         <div class="message-bubble-wrap">
-            <div class="message-bubble">${renderContent(data.message)}</div>
+            <div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>
             <div class="emoji-picker" data-msg-id="${data.msg_id}">
                 <span onclick="sendReaction(${data.msg_id}, '❤️')">❤️</span>
                 <span onclick="sendReaction(${data.msg_id}, '😂')">😂</span>
@@ -152,6 +152,7 @@ socket.on('receive_message', (data) => {
         <div class="message-meta">
             <span class="message-time">${data.timestamp}</span>
             ${isMine ? `<span class="tick" id="tick-${data.msg_id}">✓</span>` : ''}
+            ${isMine ? `<span class="edit-btn" onclick="startEdit(${data.msg_id}, '${escapeHtml(data.message).replace(/'/g, "\\'")}')">✏️</span>` : ''}
             ${isMine ? `<span class="delete-btn" onclick="showDeleteOptions(${data.msg_id}, this)">🗑️</span>` : ''}
             <span class="reply-btn" onclick="setReply(${data.msg_id}, '${escapeHtml(data.message).substring(0, 50)}')">↩️</span>
         </div>
@@ -237,6 +238,59 @@ function cancelReply() {
     currentReplyId = null;
     document.getElementById('reply-preview').style.display = 'none';
 }
+// ── Edit Message ──
+function startEdit(msgId, currentContent) {
+    const bubble = document.getElementById(`bubble-${msgId}`);
+    if (!bubble) return;
+
+    const originalContent = currentContent;
+    bubble.innerHTML = `
+        <input type="text" class="edit-input" id="edit-input-${msgId}" value="${escapeHtml(currentContent)}" />
+        <div class="edit-actions">
+            <button onclick="saveEdit(${msgId}, '${escapeHtml(originalContent)}')" class="btn-save-edit">✓ Save</button>
+            <button onclick="cancelEdit(${msgId}, '${escapeHtml(originalContent)}')" class="btn-cancel-edit">✕ Cancel</button>
+        </div>
+    `;
+    document.getElementById(`edit-input-${msgId}`).focus();
+}
+
+function saveEdit(msgId, originalContent) {
+    const input = document.getElementById(`edit-input-${msgId}`);
+    if (!input) return;
+    const newContent = input.value.trim();
+    if (!newContent) return;
+
+    fetch(`/edit_message/${msgId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newContent })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const bubble = document.getElementById(`bubble-${msgId}`);
+            if (bubble) {
+                bubble.innerHTML = `${escapeHtml(newContent)} <span class="edited-tag">(edited)</span>`;
+            }
+        } else {
+            cancelEdit(msgId, originalContent);
+        }
+    });
+}
+
+function cancelEdit(msgId, originalContent) {
+    const bubble = document.getElementById(`bubble-${msgId}`);
+    if (bubble) {
+        bubble.innerHTML = escapeHtml(originalContent);
+    }
+}
+
+socket.on('message_edited', (data) => {
+    const bubble = document.getElementById(`bubble-${data.msg_id}`);
+    if (bubble) {
+        bubble.innerHTML = `${escapeHtml(data.new_content)} <span class="edited-tag">(edited)</span>`;
+    }
+});
 
 // ── Emoji Reactions ──
 function sendReaction(msgId, emoji) {

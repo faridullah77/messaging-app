@@ -72,10 +72,10 @@
                 {% endif %}
                 <div class="message-bubble-wrap">
                     {% if '[IMAGE]' in msg.content %}
-<img src="{{ msg.content[7:-8] }}" class="chat-image" onclick="window.open('{{ msg.content[7:-8] }}', '_blank')" />
-{% else %}
-<div class="message-bubble">{{ msg.content }}</div>
-{% endif %}
+                    <img src="{{ msg.content[7:-8] }}" class="chat-image" onclick="window.open('{{ msg.content[7:-8] }}', '_blank')" />
+                    {% else %}
+                    <div class="message-bubble" id="bubble-{{ msg.id }}">{{ msg.content }}{% if msg.is_edited %} <span class="edited-tag">(edited)</span>{% endif %}</div>
+                    {% endif %}
                     {% if not msg.is_deleted %}
                     <div class="emoji-picker" data-msg-id="{{ msg.id }}">
                         <span onclick="sendReaction({{ msg.id }}, '❤️')">❤️</span>
@@ -95,6 +95,7 @@
                         {% if msg.is_read %}✓✓{% else %}✓{% endif %}
                     </span>
                     {% if not msg.is_deleted %}
+                    <span class="edit-btn" onclick="startEdit({{ msg.id }}, '{{ msg.content|replace("'", "\\'") }}')">✏️</span>
                     <span class="delete-btn" onclick="showDeleteOptions({{ msg.id }}, this)">🗑️</span>
                     {% endif %}
                     {% endif %}

@@ -57,6 +57,7 @@ class Message(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     is_read = db.Column(db.Boolean, default=False)
     is_deleted = db.Column(db.Boolean, default=False)
+    is_edited = db.Column(db.Boolean, default=False)
     reply_to_id = db.Column(db.Integer, db.ForeignKey('messages.id'), nullable=True)
     reply_to = db.relationship('Message', remote_side=[id], backref='replies')
 

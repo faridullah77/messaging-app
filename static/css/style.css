@@ -1164,3 +1164,63 @@ body.light-mode .reaction-pill { background: #f0f0f0; border-color: #e0e0e0; }
         max-height: 180px;
     }
 }
+/* ── Edit Message ── */
+.edit-btn {
+    font-size: 11px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    margin-left: 4px;
+}
+
+.message:hover .edit-btn {
+    opacity: 1;
+}
+
+@media (max-width: 768px) {
+    .edit-btn { opacity: 1; }
+}
+
+.edit-input {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid #6c63ff;
+    background: #2a2a2a;
+    color: #fff;
+    font-size: 14px;
+    outline: none;
+    margin-bottom: 6px;
+}
+
+.edit-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.btn-save-edit {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: none;
+    background: #6c63ff;
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.btn-cancel-edit {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: none;
+    background: #2a2a2a;
+    color: #888;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.edited-tag {
+    font-size: 10px;
+    color: #666;
+    font-style: italic;
+}
