@@ -363,7 +363,8 @@ def upload_image():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
-    # ── Edit Message ──
+
+# ── Edit Message ──
 @app.route('/edit_message/<int:msg_id>', methods=['POST'])
 @login_required
 def edit_message(msg_id):
@@ -381,8 +382,7 @@ def edit_message(msg_id):
     other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
     socketio.emit('message_edited', {
         'msg_id': msg_id,
-        'new_content': new_contenimport cloudinary
-import cloudinary.uploadert
+        'new_content': new_content
     }, room=f'user_{other_id}')
     socketio.emit('message_edited', {
         'msg_id': msg_id,
