@@ -8,6 +8,8 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, FriendRequest, Message, Reaction
 from datetime import datetime
+from flask_mail import Mail, Message as MailMessage
+from itsdangerous import URLSafeTimedSerializer
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey123')
@@ -21,6 +23,16 @@ if database_url.startswith('postgres://'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# ── Mail Config ──
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_EMAIL')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_EMAIL')
+
+mail = Mail(app)
+serializer = URLSafeTimedSerializer(app.secret_key)
 
 db.init_app(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
@@ -244,6 +256,56 @@ def react_message(msg_id):
     db.session.add(reaction)
     db.session.commit()
     return jsonify({'success': True, 'action': 'added'})
+# ── Forgot Password ──
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token = serializer.dumps(email, salt='password-reset')
+            reset_url = url_for('reset_password', token=token, _external=True)
+            msg = MailMessage(
+                subject='Password Reset - Messenger App',
+                recipients=[email],
+                body=f'''Hi {user.username}!
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you did not request a password reset, ignore this email.
+'''
+            )
+            mail.send(msg)
+        flash('Agar email registered hai toh reset link bhej diya gaya hai!')
+        return redirect(url_for('forgot_password'))
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    try:
+        email = serializer.loads(token, salt='password-reset', max_age=3600)
+    except:
+        flash('Reset link expired ya invalid hai!')
+        return redirect(url_for('forgot_password'))
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm_password', '')
+        if password != confirm:
+            flash('Passwords match nahi kar rahe!')
+            return render_template('reset_password.html', token=token)
+        if len(password) < 6:
+            flash('Password kam az kam 6 characters ka hona chahiye!')
+            return render_template('reset_password.html', token=token)
+        user = User.query.filter_by(email=email).first()
+        if user:
+            user.password = generate_password_hash(password)
+            db.session.commit()
+            flash('Password reset ho gaya! Ab login karo.')
+            return redirect(url_for('login'))
+    return render_template('reset_password.html', token=token)
 
 # ── Socket Events ──
 @socketio.on('connect')
