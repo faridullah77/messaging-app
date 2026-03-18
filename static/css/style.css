@@ -540,12 +540,14 @@ body {
 
 /* ── Input Area ── */
 .input-area {
-    padding: 10px 16px;
+    padding: 10px 12px;
     border-top: none;
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
     background: #f0f2f5;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .input-area input {
@@ -739,8 +741,9 @@ body {
     order: -1;
 }
 
+/* Hide on mobile completely - use long press instead */
 @media (max-width: 768px) {
-    .reaction-trigger { opacity: 1; }
+    .reaction-trigger { display: none; }
 }
 
 .emoji-picker {
@@ -1153,4 +1156,12 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
     font-size: 10px;
     cursor: pointer;
     border: 1px solid #fff;
+}
+@media (max-width: 768px) {
+    .input-area button#send-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
 }
