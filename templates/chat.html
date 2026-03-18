@@ -26,7 +26,7 @@
                     {% if friend.is_online %}
                         ● Online
                     {% elif friend.last_seen %}
-                        Last seen {{ friend.last_seen.strftime('%I:%M %p') }}
+                        Last seen <span class="last-seen-time" data-utc="{{ friend.last_seen.isoformat() }}"></span>
                     {% else %}
                         ● Offline
                     {% endif %}
