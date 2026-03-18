@@ -138,7 +138,7 @@ socket.on('receive_message', (data) => {
         ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
         ${replyHtml}
        <div class="message-bubble-wrap">
-            <button class="reaction-trigger" onclick="togglePicker(${data.msg_id}, this)">😊</button>
+            <button class="reaction-trigger d-desktop-only" onclick="togglePicker(${data.msg_id}, this)">😊</button>
             <div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>
             <div class="emoji-picker" id="picker-${data.msg_id}" data-msg-id="${data.msg_id}">
                 <span onclick="sendReaction(${data.msg_id}, '❤️')">❤️</span>
