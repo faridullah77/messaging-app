@@ -479,7 +479,59 @@ def view_once_image(msg_id):
         socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{current_user.id}')
         return jsonify({'success': True})
     return jsonify({'success': False})
+# ── Profile Page ──
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    if request.method == 'POST':
+        action = request.form.get('action')
 
+        if action == 'update_profile':
+            username = request.form.get('username', '').strip()
+            bio = request.form.get('bio', '').strip()
+            if username and username != current_user.username:
+                if User.query.filter_by(username=username).first():
+                    flash('Username already taken!')
+                    return redirect(url_for('profile'))
+            if username:
+                current_user.username = username
+            current_user.bio = bio
+            db.session.commit()
+            flash('Profile updated! ✅')
+
+        elif action == 'update_email':
+            email = request.form.get('email', '').strip()
+            password = request.form.get('current_password_email', '')
+            if not check_password_hash(current_user.password, password):
+                flash('Wrong password!')
+                return redirect(url_for('profile'))
+            if email != current_user.email:
+                if User.query.filter_by(email=email).first():
+                    flash('Email already registered!')
+                    return redirect(url_for('profile'))
+            current_user.email = email
+            db.session.commit()
+            flash('Email updated! ✅')
+
+        elif action == 'update_password':
+            old_password = request.form.get('old_password', '')
+            new_password = request.form.get('new_password', '')
+            confirm_password = request.form.get('confirm_password', '')
+            if not check_password_hash(current_user.password, old_password):
+                flash('Current password galat hai!')
+                return redirect(url_for('profile'))
+            if new_password != confirm_password:
+                flash('Naye passwords match nahi kar rahe!')
+                return redirect(url_for('profile'))
+            if len(new_password) < 6:
+                flash('Password kam az kam 6 characters ka hona chahiye!')
+                return redirect(url_for('profile'))
+            current_user.password = generate_password_hash(new_password)
+            db.session.commit()
+            flash('Password updated! ✅')
+
+        return redirect(url_for('profile'))
+    return render_template('profile.html')
 # ── Socket Events ──
 @socketio.on('connect')
 def handle_connect():

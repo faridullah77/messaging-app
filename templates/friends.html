@@ -20,7 +20,9 @@
                 </label>
             </div>
             <div class="user-info">
-                <span class="my-username">{{ current_user.username }}</span>
+                <a href="/profile" style="text-decoration:none;">
+                    <span class="my-username" style="cursor:pointer;">{{ current_user.username }}</span>
+                </a>
                 <span class="status">● Online</span>
                 <span class="my-bio" id="my-bio-text" onclick="editBio()">
                     {{ current_user.bio if current_user.bio else '+ Add bio' }}
