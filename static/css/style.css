@@ -1065,3 +1065,32 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
 .edit-profile-btn:hover {
     background: #128c7e;
 }
+/* ── Input Icons Grid ── */
+.input-icons-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.input-icons-grid button,
+.input-icons-grid label {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    cursor: pointer;
+    border-radius: 6px;
+    background: none;
+    border: none;
+    padding: 0;
+    transition: background 0.2s;
+}
+
+.input-icons-grid button:hover,
+.input-icons-grid label:hover {
+    background: #e9edef;
+}
