@@ -488,7 +488,19 @@ if (localStorage.getItem('theme') === 'light') {
 // ── Helpers ──
 function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    document.getElementById('scroll-bottom-btn').style.display = 'none';
 }
+
+// ── Show/hide scroll button ──
+messagesContainer.addEventListener('scroll', () => {
+    const btn = document.getElementById('scroll-bottom-btn');
+    const distanceFromBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight;
+    if (distanceFromBottom > 200) {
+        btn.style.display = 'flex';
+    } else {
+        btn.style.display = 'none';
+    }
+});
 
 function renderContent(content) {
     if (content.startsWith('[IMAGE]') && content.endsWith('[/IMAGE]')) {
