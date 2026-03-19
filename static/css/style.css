@@ -1165,3 +1165,29 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
     color: #128c7e;
     font-size: 11px;
 }
+/* ── Stats ── */
+.stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.stat-card {
+    background: #f0f2f5;
+    border-radius: 12px;
+    padding: 14px;
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 28px;
+    font-weight: 700;
+    color: #128c7e;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: #667781;
+    margin-top: 4px;
+}

@@ -532,6 +532,55 @@ def profile():
 
         return redirect(url_for('profile'))
     return render_template('profile.html')
+# ── Message Statistics ──
+@app.route('/stats/<int:friend_id>')
+@login_required
+def message_stats(friend_id):
+    friend = User.query.get_or_404(friend_id)
+    if not current_user.is_friend_with(friend):
+        return jsonify({'error': 'Not friends'})
+
+    sent = Message.query.filter_by(
+        sender_id=current_user.id,
+        receiver_id=friend_id
+    ).count()
+
+    received = Message.query.filter_by(
+        sender_id=friend_id,
+        receiver_id=current_user.id
+    ).count()
+
+    sent_images = Message.query.filter(
+        Message.sender_id == current_user.id,
+        Message.receiver_id == friend_id,
+        Message.content.like('%[IMAGE]%')
+    ).count()
+
+    received_images = Message.query.filter(
+        Message.sender_id == friend_id,
+        Message.receiver_id == current_user.id,
+        Message.content.like('%[IMAGE]%')
+    ).count()
+
+    # First message date
+    first_msg = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
+        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id))
+    ).order_by(Message.timestamp.asc()).first()
+
+    days_chatting = 0
+    if first_msg:
+        days_chatting = (datetime.utcnow() - first_msg.timestamp).days + 1
+
+    return jsonify({
+        'sent': sent,
+        'received': received,
+        'total': sent + received,
+        'sent_images': sent_images,
+        'received_images': received_images,
+        'days_chatting': days_chatting,
+        'friend_username': friend.username
+    })
 # ── Socket Events ──
 @socketio.on('connect')
 def handle_connect():

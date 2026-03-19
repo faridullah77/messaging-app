@@ -584,3 +584,39 @@ document.getElementById('custom-wallpaper-input')?.addEventListener('change', (e
     };
     reader.readAsDataURL(file);
 });
+// ── Message Statistics ──
+function showStats() {
+    document.getElementById('stats-modal').style.display = 'flex';
+    fetch(`/stats/${FRIEND_ID}`)
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('stats-content').innerHTML = `
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">${data.total}</div>
+                    <div class="stat-label">Total Messages</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${data.sent}</div>
+                    <div class="stat-label">You Sent</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${data.received}</div>
+                    <div class="stat-label">You Received</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${data.sent_images + data.received_images}</div>
+                    <div class="stat-label">Images Shared</div>
+                </div>
+                <div class="stat-card" style="grid-column: span 2;">
+                    <div class="stat-number">${data.days_chatting}</div>
+                    <div class="stat-label">Days Chatting Together 🎉</div>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function closeStatsModal() {
+    document.getElementById('stats-modal').style.display = 'none';
+}
