@@ -1217,3 +1217,98 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
 .tick.seen:hover::after {
     opacity: 1;
 }
+/* ── Chat Sidebar Redesign ── */
+.chat-sidebar-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e9edef;
+    width: 100%;
+}
+
+.chat-back-btn {
+    text-decoration: none;
+    color: #128c7e;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: #f0f2f5;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.chat-back-btn:hover { background: #e9edef; }
+
+.active-friend-compact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.active-friend-compact .friend-info {
+    min-width: 0;
+}
+
+.active-friend-compact .friend-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111b21;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.active-friend-compact .friend-bio {
+    font-size: 11px;
+    color: #667781;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+
+.chat-action-btns {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.chat-action-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: #f0f2f5;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.chat-action-btn:hover {
+    background: #e9edef;
+    transform: scale(1.1);
+}
+
+@media (max-width: 768px) {
+    .chat-sidebar-top {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .chat-back-btn {
+        font-size: 12px;
+        padding: 5px 8px;
+    }
+
+    .active-friend-compact .friend-name {
+        font-size: 13px;
+    }
+}

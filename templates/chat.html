@@ -10,14 +10,29 @@
 <div class="app-container">
 
     <!-- Sidebar -->
+    <!-- Sidebar -->
     <div class="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-actions">
-                <a href="/friends" class="leave-btn">← Back</a>
+        <div class="chat-sidebar-top">
+            <a href="/friends" class="chat-back-btn">← Back</a>
+            <div class="active-friend-compact">
+                {% if friend.avatar_url %}
+                <img src="{{ friend.avatar_url }}" class="friend-avatar-img"/>
+                {% else %}
+                <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
+                {% endif %}
+                <div class="friend-info">
+                    <span class="friend-name">{{ friend.username }}</span>
+                    {% if friend.bio %}
+                    <span class="friend-bio">{{ friend.bio }}</span>
+                    {% endif %}
+                </div>
             </div>
-            <button class="wallpaper-btn" onclick="showWallpaperPicker()">🎨 Wallpaper</button>
-            <button class="wallpaper-btn" onclick="showStats()" style="margin-top:4px;">📊 Stats</button>
+            <div class="chat-action-btns">
+                <button class="chat-action-btn" onclick="showWallpaperPicker()" title="Wallpaper">🎨</button>
+                <button class="chat-action-btn" onclick="showStats()" title="Stats">📊</button>
+            </div>
         </div>
+    </div>
 
 <!-- Wallpaper Picker Modal -->
 <div class="modal-overlay" id="wallpaper-modal" style="display:none">
