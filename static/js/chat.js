@@ -210,7 +210,15 @@ socket.on('receive_message', (data) => {
 // ── Message Read ──
 socket.on('message_read', (data) => {
     const tick = document.getElementById(`tick-${data.msg_id}`);
-    if (tick) { tick.textContent = '✓✓'; tick.classList.add('seen'); }
+    if (tick) {
+        tick.textContent = '✓✓';
+        tick.classList.add('seen');
+        if (data.read_at) {
+            const readTime = formatLocalTime(data.read_at);
+            tick.dataset.readAt = data.read_at;
+            tick.title = `Seen at ${readTime}`;
+        }
+    }
 });
 
 // ── Message Deleted ──

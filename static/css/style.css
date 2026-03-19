@@ -1191,3 +1191,29 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
     color: #667781;
     margin-top: 4px;
 }
+/* ── Seen Tooltip ── */
+.tick.seen {
+    position: relative;
+    cursor: default;
+}
+
+.tick.seen::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 20px;
+    right: 0;
+    background: rgba(0,0,0,0.75);
+    color: #fff;
+    font-size: 10px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 100;
+}
+
+.tick.seen:hover::after {
+    opacity: 1;
+}

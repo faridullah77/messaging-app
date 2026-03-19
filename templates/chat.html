@@ -129,7 +129,12 @@
                 <div class="message-meta">
                     <span class="message-time" data-utc="{{ msg.timestamp.isoformat() }}"></span>
                     {% if msg.sender_id == current_user.id %}
-                    <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}">
+                    <span class="tick {% if msg.is_read %}seen{% endif %}" 
+                          id="tick-{{ msg.id }}"
+                          {% if msg.is_read and msg.read_at %}
+                          data-read-at="{{ msg.read_at.isoformat() }}"
+                          title="Seen at {{ msg.read_at.strftime('%I:%M %p') }}"
+                          {% endif %}>
                         {% if msg.is_read %}✓✓{% else %}✓{% endif %}
                     </span>
                     {% if not msg.is_deleted %}

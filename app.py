@@ -670,8 +670,13 @@ def handle_message_seen(data):
     msg = Message.query.get(msg_id)
     if msg and msg.receiver_id == current_user.id:
         msg.is_read = True
+        msg.read_at = datetime.utcnow()
         db.session.commit()
-        emit('message_read', {'msg_id': msg_id}, room=f'user_{msg.sender_id}')
+        read_at_str = msg.read_at.isoformat()
+        emit('message_read', {
+            'msg_id': msg_id,
+            'read_at': read_at_str
+        }, room=f'user_{msg.sender_id}')
 
 @socketio.on('send_reaction')
 def handle_reaction(data):
