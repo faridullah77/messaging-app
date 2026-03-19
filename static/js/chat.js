@@ -138,7 +138,8 @@ function sendMessage() {
         receiver_id: FRIEND_ID,
         reply_to_id: currentReplyId
     });
-    messageInput.value = '';
+   messageInput.value = '';
+    messageInput.style.height = 'auto';
     messageInput.focus();
     cancelReply();
     socket.emit('stop_typing', { receiver_id: FRIEND_ID });
@@ -146,17 +147,24 @@ function sendMessage() {
 
 sendBtn.addEventListener('click', sendMessage);
 messageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') sendMessage();
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
 });
 
-// ── Typing Indicator ──
+// ── Auto resize textarea ──
 messageInput.addEventListener('input', () => {
+    messageInput.style.height = 'auto';
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
     socket.emit('typing', { receiver_id: FRIEND_ID });
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => {
         socket.emit('stop_typing', { receiver_id: FRIEND_ID });
     }, 2000);
 });
+
+
 
 socket.on('user_typing', (data) => {
     if (data.sender_id !== CURRENT_USER_ID) {
