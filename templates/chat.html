@@ -10,7 +10,6 @@
 <div class="app-container">
 
     <!-- Sidebar -->
-    <!-- Sidebar -->
     <div class="sidebar">
         <div class="chat-sidebar-top">
             <a href="/friends" class="chat-back-btn">← Back</a>
@@ -30,53 +29,6 @@
             <div class="chat-action-btns">
                 <button class="chat-action-btn" onclick="showWallpaperPicker()" title="Wallpaper">🎨</button>
                 <button class="chat-action-btn" onclick="showStats()" title="Stats">📊</button>
-            </div>
-        </div>
-    </div>
-
-<!-- Wallpaper Picker Modal -->
-<div class="modal-overlay" id="wallpaper-modal" style="display:none">
-    <div class="modal-box">
-        <p>Choose Wallpaper</p>
-        <div class="wallpaper-grid">
-            <div class="wallpaper-option" style="background:#eae6df;" onclick="setWallpaper('default')">Default</div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#667eea,#764ba2);" onclick="setWallpaper('purple')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#f093fb,#f5576c);" onclick="setWallpaper('pink')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#4facfe,#00f2fe);" onclick="setWallpaper('blue')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#43e97b,#38f9d7);" onclick="setWallpaper('green')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#fa709a,#fee140);" onclick="setWallpaper('sunset')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb);" onclick="setWallpaper('lavender')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#ffecd2,#fcb69f);" onclick="setWallpaper('peach')"></div>
-            <div class="wallpaper-option" style="background:#1a1a2e;" onclick="setWallpaper('dark')">🌙</div>
-            <div class="wallpaper-option custom-wallpaper-option" onclick="document.getElementById('custom-wallpaper-input').click()">
-                📷 Custom
-                <input type="file" id="custom-wallpaper-input" accept="image/*" style="display:none"/>
-            </div>
-        </div>
-        <button class="btn-cancel" onclick="closeWallpaperModal()">Cancel</button>
-    </div>
-</div>
-        <div class="sidebar-section-title">Chatting With</div>
-        <div class="active-friend">
-            {% if friend.avatar_url %}
-            <img src="{{ friend.avatar_url }}" class="friend-avatar-img"/>
-            {% else %}
-            <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
-            {% endif %}
-            <div class="friend-info">
-                <span class="friend-name">{{ friend.username }}</span>
-                {% if friend.bio %}
-                <span class="friend-bio">{{ friend.bio }}</span>
-                {% endif %}
-                <span class="friend-status {% if friend.is_online %}online{% else %}offline{% endif %}">
-                    {% if friend.is_online %}
-                        ● Online
-                    {% elif friend.last_seen %}
-                        Last seen <span class="last-seen-time" data-utc="{{ friend.last_seen.isoformat() }}"></span>
-                    {% else %}
-                        ● Offline
-                    {% endif %}
-                </span>
             </div>
         </div>
     </div>
@@ -118,7 +70,7 @@
                 {% endif %}
                 {% if msg.content == '[VIEW_ONCE_VIEWED]' %}
                 <div class="view-once-viewed">👁️ Viewed</div>
-               {% elif msg.view_once and msg.sender_id != current_user.id and not msg.viewed %}
+                {% elif msg.view_once and msg.sender_id != current_user.id and not msg.viewed %}
                 <div class="view-once-tap" data-url="{{ msg.content[7:-8] }}" onclick="viewOnceImage({{ msg.id }}, this)">
                     👁️ Tap to view (view once)
                 </div>
@@ -143,7 +95,7 @@
                 <div class="message-meta">
                     <span class="message-time" data-utc="{{ msg.timestamp.isoformat() }}"></span>
                     {% if msg.sender_id == current_user.id %}
-                    <span class="tick {% if msg.is_read %}seen{% endif %}" 
+                    <span class="tick {% if msg.is_read %}seen{% endif %}"
                           id="tick-{{ msg.id }}"
                           {% if msg.is_read and msg.read_at %}
                           data-read-at="{{ msg.read_at.isoformat() }}"
@@ -163,9 +115,9 @@
             </div>
             {% endfor %}
         </div>
-        <button class="scroll-bottom-btn" id="scroll-bottom-btn" onclick="scrollToBottom()" title="Scroll to bottom">
-            ↓
-        </button>
+
+        <button class="scroll-bottom-btn" id="scroll-bottom-btn" onclick="scrollToBottom()" title="Scroll to bottom">↓</button>
+
         <div class="input-area">
             <div class="input-icons-grid">
                 <button class="search-toggle-btn" onclick="toggleSearch()" title="Search">🔍</button>
@@ -191,7 +143,30 @@
 
 </div>
 
-<!-- Delete Options Modal -->
+<!-- Wallpaper Modal -->
+<div class="modal-overlay" id="wallpaper-modal" style="display:none">
+    <div class="modal-box">
+        <p>Choose Wallpaper</p>
+        <div class="wallpaper-grid">
+            <div class="wallpaper-option" style="background:#eae6df;" onclick="setWallpaper('default')">Default</div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#667eea,#764ba2);" onclick="setWallpaper('purple')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#f093fb,#f5576c);" onclick="setWallpaper('pink')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#4facfe,#00f2fe);" onclick="setWallpaper('blue')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#43e97b,#38f9d7);" onclick="setWallpaper('green')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#fa709a,#fee140);" onclick="setWallpaper('sunset')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb);" onclick="setWallpaper('lavender')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#ffecd2,#fcb69f);" onclick="setWallpaper('peach')"></div>
+            <div class="wallpaper-option" style="background:#1a1a2e;" onclick="setWallpaper('dark')">🌙</div>
+            <div class="wallpaper-option custom-wallpaper-option" onclick="document.getElementById('custom-wallpaper-input').click()">
+                📷 Custom
+                <input type="file" id="custom-wallpaper-input" accept="image/*" style="display:none"/>
+            </div>
+        </div>
+        <button class="btn-cancel" onclick="closeWallpaperModal()">Cancel</button>
+    </div>
+</div>
+
+<!-- Delete Modal -->
 <div class="modal-overlay" id="delete-modal" style="display:none">
     <div class="modal-box">
         <p>Delete message?</p>
