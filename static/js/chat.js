@@ -585,8 +585,7 @@ document.getElementById('custom-wallpaper-input')?.addEventListener('change', (e
     reader.readAsDataURL(file);
 });
 // ── Message Statistics ──
-function showStats() {
-    document.getElementById('stats-modal').style.display = 'flex';
+console.log('Stats clicked, FRIEND_ID:', FRIEND_ID);
     fetch(`/stats/${FRIEND_ID}`)
     .then(res => res.json())
     .then(data => {
