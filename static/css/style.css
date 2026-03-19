@@ -175,8 +175,8 @@ html, body {
 .friend-item:hover { background: #f0f2f5; }
 
 .friend-avatar {
-    width: 36px;
-    height: 36px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
     background: linear-gradient(135deg, #128c7e, #25d366);
     display: flex;
@@ -801,8 +801,8 @@ html, body {
 }
 
 .friend-avatar-img {
-    width: 36px;
-    height: 36px;
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid #25d366;
