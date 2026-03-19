@@ -79,8 +79,8 @@
                 {% endif %}
                 {% if msg.content == '[VIEW_ONCE_VIEWED]' %}
                 <div class="view-once-viewed">👁️ Viewed</div>
-                {% elif msg.view_once and msg.sender_id != current_user.id and not msg.viewed %}
-                <div class="view-once-tap" onclick="viewOnceImage({{ msg.id }}, this)">
+               {% elif msg.view_once and msg.sender_id != current_user.id and not msg.viewed %}
+                <div class="view-once-tap" data-url="{{ msg.content[7:-8] }}" onclick="viewOnceImage({{ msg.id }}, this)">
                     👁️ Tap to view (view once)
                 </div>
                 {% elif msg.view_once and msg.sender_id == current_user.id %}
