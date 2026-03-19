@@ -1042,3 +1042,20 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
     font-size: 10px;
     border: 2px solid #fff;
 }
+/* ── Edit Profile Button ── */
+.edit-profile-btn {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 3px 10px;
+    background: #25d366;
+    color: #fff;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.edit-profile-btn:hover {
+    background: #128c7e;
+}

@@ -7,23 +7,19 @@
 
     <!-- Sidebar -->
     <div class="sidebar">
-      <div class="sidebar-header">
-            <a href="/profile" style="text-decoration:none; position:relative; flex-shrink:0;">
-                {% if current_user.avatar_url %}
-                <img src="{{ current_user.avatar_url }}" class="avatar-img-large"/>
-                {% else %}
-                <div class="avatar-large">{{ current_user.username[0].upper() }}</div>
-                {% endif %}
-                <span class="avatar-edit-badge">✏️</span>
-            </a>
+     <div class="sidebar-header">
+            {% if current_user.avatar_url %}
+            <img src="{{ current_user.avatar_url }}" class="avatar-img-large" style="flex-shrink:0;"/>
+            {% else %}
+            <div class="avatar-large" style="flex-shrink:0;">{{ current_user.username[0].upper() }}</div>
+            {% endif %}
             <div class="user-info">
-                <a href="/profile" style="text-decoration:none;">
-                    <span class="my-username">{{ current_user.username }}</span>
-                </a>
+                <span class="my-username">{{ current_user.username }}</span>
                 <span class="status">● Online</span>
                 {% if current_user.bio %}
                 <span class="my-bio">{{ current_user.bio }}</span>
                 {% endif %}
+                <a href="/profile" class="edit-profile-btn">✏️ Edit Profile</a>
             </div>
         </div>
 
