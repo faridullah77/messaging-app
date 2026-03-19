@@ -7,26 +7,23 @@
 
     <!-- Sidebar -->
     <div class="sidebar">
-       <div class="sidebar-header">
-            <div class="avatar-wrapper">
+      <div class="sidebar-header">
+            <a href="/profile" style="text-decoration:none; position:relative; flex-shrink:0;">
                 {% if current_user.avatar_url %}
-                <img src="{{ current_user.avatar_url }}" class="avatar-img" id="my-avatar-img"/>
+                <img src="{{ current_user.avatar_url }}" class="avatar-img-large"/>
                 {% else %}
-                <div class="avatar" id="my-avatar-text">{{ current_user.username[0].upper() }}</div>
+                <div class="avatar-large">{{ current_user.username[0].upper() }}</div>
                 {% endif %}
-                <label class="avatar-upload-label" title="Change DP">
-                    📷
-                    <input type="file" id="avatar-input" accept="image/*" style="display:none"/>
-                </label>
-            </div>
+                <span class="avatar-edit-badge">✏️</span>
+            </a>
             <div class="user-info">
                 <a href="/profile" style="text-decoration:none;">
-                    <span class="my-username" style="cursor:pointer;">{{ current_user.username }}</span>
+                    <span class="my-username">{{ current_user.username }}</span>
                 </a>
                 <span class="status">● Online</span>
-                <span class="my-bio" id="my-bio-text" onclick="editBio()">
-                    {{ current_user.bio if current_user.bio else '+ Add bio' }}
-                </span>
+                {% if current_user.bio %}
+                <span class="my-bio">{{ current_user.bio }}</span>
+                {% endif %}
             </div>
         </div>
 
