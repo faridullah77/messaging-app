@@ -515,3 +515,72 @@ function escapeHtml(text) {
     div.appendChild(document.createTextNode(text));
     return div.innerHTML;
 }
+// ── Custom Wallpaper ──
+const WALLPAPER_KEY = `wallpaper_${FRIEND_ID}`;
+const chatArea = document.querySelector('.chat-area');
+
+const wallpapers = {
+    'default': { type: 'pattern', value: '#eae6df' },
+    'purple': { type: 'gradient', value: 'linear-gradient(135deg,#667eea,#764ba2)' },
+    'pink': { type: 'gradient', value: 'linear-gradient(135deg,#f093fb,#f5576c)' },
+    'blue': { type: 'gradient', value: 'linear-gradient(135deg,#4facfe,#00f2fe)' },
+    'green': { type: 'gradient', value: 'linear-gradient(135deg,#43e97b,#38f9d7)' },
+    'sunset': { type: 'gradient', value: 'linear-gradient(135deg,#fa709a,#fee140)' },
+    'lavender': { type: 'gradient', value: 'linear-gradient(135deg,#a18cd1,#fbc2eb)' },
+    'peach': { type: 'gradient', value: 'linear-gradient(135deg,#ffecd2,#fcb69f)' },
+    'dark': { type: 'color', value: '#1a1a2e' },
+};
+
+function applyWallpaper(saved) {
+    if (!saved) return;
+    if (saved.type === 'pattern') {
+        chatArea.style.backgroundImage = '';
+        chatArea.style.backgroundColor = saved.value;
+    } else if (saved.type === 'gradient') {
+        chatArea.style.backgroundImage = saved.value;
+        chatArea.style.backgroundColor = '';
+    } else if (saved.type === 'color') {
+        chatArea.style.backgroundImage = 'none';
+        chatArea.style.backgroundColor = saved.value;
+    } else if (saved.type === 'custom') {
+        chatArea.style.backgroundImage = `url(${saved.value})`;
+        chatArea.style.backgroundSize = 'cover';
+        chatArea.style.backgroundPosition = 'center';
+    }
+}
+
+// Load saved wallpaper
+try {
+    const saved = JSON.parse(localStorage.getItem(WALLPAPER_KEY));
+    if (saved) applyWallpaper(saved);
+} catch(e) {}
+
+function showWallpaperPicker() {
+    document.getElementById('wallpaper-modal').style.display = 'flex';
+}
+
+function closeWallpaperModal() {
+    document.getElementById('wallpaper-modal').style.display = 'none';
+}
+
+function setWallpaper(name) {
+    const wp = wallpapers[name];
+    if (!wp) return;
+    localStorage.setItem(WALLPAPER_KEY, JSON.stringify(wp));
+    applyWallpaper(wp);
+    closeWallpaperModal();
+}
+
+// Custom image wallpaper
+document.getElementById('custom-wallpaper-input')?.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const wp = { type: 'custom', value: ev.target.result };
+        localStorage.setItem(WALLPAPER_KEY, JSON.stringify(wp));
+        applyWallpaper(wp);
+        closeWallpaperModal();
+    };
+    reader.readAsDataURL(file);
+});

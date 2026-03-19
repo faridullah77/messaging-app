@@ -16,7 +16,31 @@
                 <a href="/friends" class="leave-btn">← Back</a>
                 <a href="/logout" class="leave-btn logout">Logout</a>
             </div>
+            <button class="wallpaper-btn" onclick="showWallpaperPicker()">🎨 Wallpaper</button>
         </div>
+
+<!-- Wallpaper Picker Modal -->
+<div class="modal-overlay" id="wallpaper-modal" style="display:none">
+    <div class="modal-box">
+        <p>Choose Wallpaper</p>
+        <div class="wallpaper-grid">
+            <div class="wallpaper-option" style="background:#eae6df;" onclick="setWallpaper('default')">Default</div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#667eea,#764ba2);" onclick="setWallpaper('purple')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#f093fb,#f5576c);" onclick="setWallpaper('pink')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#4facfe,#00f2fe);" onclick="setWallpaper('blue')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#43e97b,#38f9d7);" onclick="setWallpaper('green')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#fa709a,#fee140);" onclick="setWallpaper('sunset')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb);" onclick="setWallpaper('lavender')"></div>
+            <div class="wallpaper-option" style="background:linear-gradient(135deg,#ffecd2,#fcb69f);" onclick="setWallpaper('peach')"></div>
+            <div class="wallpaper-option" style="background:#1a1a2e;" onclick="setWallpaper('dark')">🌙</div>
+            <div class="wallpaper-option custom-wallpaper-option" onclick="document.getElementById('custom-wallpaper-input').click()">
+                📷 Custom
+                <input type="file" id="custom-wallpaper-input" accept="image/*" style="display:none"/>
+            </div>
+        </div>
+        <button class="btn-cancel" onclick="closeWallpaperModal()">Cancel</button>
+    </div>
+</div>
         <div class="sidebar-section-title">Chatting With</div>
         <div class="active-friend">
             {% if friend.avatar_url %}
