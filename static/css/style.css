@@ -1312,3 +1312,46 @@ body.light-mode .btn-delete-me { background: #2a3942; color: #e9edef; }
         font-size: 13px;
     }
 }
+/* ── Friend status in chat header ── */
+.friend-status-small {
+    font-size: 11px;
+    display: block;
+}
+.friend-status-small.online { color: #25d366; }
+.friend-status-small.offline { color: #667781; }
+
+/* ── Fix chat sidebar sticky on mobile ── */
+@media (max-width: 768px) {
+    .sidebar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        padding: 0;
+    }
+
+    .chat-sidebar-top {
+        background: #fff;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+    }
+
+    .chat-area {
+        height: auto !important;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .app-container {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+        height: auto;
+    }
+
+    .messages-container {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 300px;
+    }
+}

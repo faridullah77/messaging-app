@@ -19,11 +19,13 @@
                 {% else %}
                 <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
                 {% endif %}
-                <div class="friend-info">
+               <div class="friend-info">
                     <span class="friend-name">{{ friend.username }}</span>
-                    {% if friend.bio %}
-                    <span class="friend-bio">{{ friend.bio }}</span>
-                    {% endif %}
+                    <span class="friend-status-small {% if friend.is_online %}online{% else %}offline{% endif %}">
+                        {% if friend.is_online %}● Online
+                        {% elif friend.last_seen %}Last seen <span class="last-seen-time" data-utc="{{ friend.last_seen.isoformat() }}"></span>
+                        {% else %}● Offline{% endif %}
+                    </span>
                 </div>
             </div>
             <div class="chat-action-btns">
