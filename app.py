@@ -7,13 +7,14 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, FriendRequest, Message, Reaction, PushSubscription
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_mail import Mail, Message as MailMessage
 from itsdangerous import URLSafeTimedSerializer
 import cloudinary
 import cloudinary.uploader
 from pywebpush import webpush, WebPushException
 import json
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey123')
 
@@ -216,6 +217,7 @@ def chat(friend_id):
     ).order_by(Message.timestamp.asc()).all()
 
     return render_template('chat.html', friend=friend, messages=messages)
+
 # ── Search Messages ──
 @app.route('/search_messages/<int:friend_id>')
 @login_required
@@ -280,6 +282,7 @@ def react_message(msg_id):
     db.session.add(reaction)
     db.session.commit()
     return jsonify({'success': True, 'action': 'added'})
+
 # ── Forgot Password ──
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
@@ -330,6 +333,7 @@ def reset_password(token):
             flash('Password reset ho gaya! Ab login karo.')
             return redirect(url_for('login'))
     return render_template('reset_password.html', token=token)
+
 # ── Image Upload ──
 @app.route('/upload_image', methods=['POST'])
 @login_required
@@ -402,6 +406,7 @@ def edit_message(msg_id):
         'new_content': new_content
     }, room=f'user_{current_user.id}')
     return jsonify({'success': True})
+
 # ── Push Notifications ──
 @app.route('/get_vapid_public_key')
 def get_vapid_public_key():
@@ -413,7 +418,6 @@ def save_subscription():
     subscription = request.json
     if not subscription:
         return jsonify({'success': False})
-    # Delete old subscriptions for this user
     PushSubscription.query.filter_by(user_id=current_user.id).delete()
     sub = PushSubscription(
         user_id=current_user.id,
@@ -438,6 +442,7 @@ def send_push_notification(user_id, title, body):
             if '410' in str(e):
                 db.session.delete(sub)
                 db.session.commit()
+
 # ── Upload Avatar ──
 @app.route('/upload_avatar', methods=['POST'])
 @login_required
@@ -462,7 +467,8 @@ def upload_avatar():
         return jsonify({'success': True, 'avatar_url': current_user.avatar_url})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
-    # ── Update Bio ──
+
+# ── Update Bio ──
 @app.route('/update_bio', methods=['POST'])
 @login_required
 def update_bio():
@@ -472,6 +478,7 @@ def update_bio():
     current_user.bio = bio
     db.session.commit()
     return jsonify({'success': True})
+
 # ── View Once ──
 @app.route('/view_once/<int:msg_id>', methods=['POST'])
 @login_required
@@ -483,12 +490,12 @@ def view_once_image(msg_id):
         msg.viewed = True
         msg.content = '[VIEW_ONCE_VIEWED]'
         db.session.commit()
-        # Notify sender
         other_id = msg.sender_id
         socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{other_id}')
         socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{current_user.id}')
         return jsonify({'success': True})
     return jsonify({'success': False})
+
 # ── Profile Page ──
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
@@ -542,6 +549,7 @@ def profile():
 
         return redirect(url_for('profile'))
     return render_template('profile.html')
+
 # ── Message Statistics ──
 @app.route('/stats/<int:friend_id>')
 @login_required
@@ -588,27 +596,8 @@ def message_stats(friend_id):
         'days_chatting': days_chatting,
         'friend_username': friend.username
     })
-    # First message date
-    first_msg = Message.query.filter(
-        ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
-        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id))
-    ).order_by(Message.timestamp.asc()).first()
 
-    days_chatting = 0
-    if first_msg:
-        days_chatting = (datetime.utcnow() - first_msg.timestamp).days + 1
-
-    return jsonify({
-        'sent': sent,
-        'received': received,
-        'total': sent + received,
-        'sent_images': sent_images,
-        'received_images': received_images,
-        'days_chatting': days_chatting,
-        'friend_username': friend.username
-    })
-from datetime import datetime, timedelta
-
+# ── Last Seen Helper ──
 def get_last_seen_text(last_seen_time):
     if not last_seen_time:
         return "Offline"
@@ -627,10 +616,10 @@ def get_last_seen_text(last_seen_time):
     
     return last_seen_time.strftime('%b %d')
 
-# Make this function available in your Jinja2 templates
 @app.context_processor
 def utility_processor():
     return dict(get_last_seen_text=get_last_seen_text)
+
 # ── Socket Events ──
 @socketio.on('connect')
 def handle_connect():
@@ -686,7 +675,6 @@ def handle_message(data):
     }
     emit('receive_message', payload, room=f'user_{receiver_id}')
     emit('receive_message', payload, room=f'user_{current_user.id}')
-    # Send push notification to receiver
     try:
         send_push_notification(
             receiver_id,
@@ -764,257 +752,7 @@ def handle_stop_typing(data):
         'sender_id': current_user.id
     }, room=f'user_{receiver_id}')
 
-with app.app_context():
-    db.create_all()
-
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     socketio.run(app, debug=True)
-    # Add to your app.py
-
-# ── Group Chat Routes ──
-@app.route('/create_group', methods=['POST'])
-@login_required
-def create_group():
-    data = request.json
-    group = Group(
-        name=data['name'],
-        description=data.get('description', ''),
-        created_by=current_user.id
-    )
-    db.session.add(group)
-    db.session.commit()
-    
-    # Add creator as admin
-    member = GroupMember(group_id=group.id, user_id=current_user.id, role='admin')
-    db.session.add(member)
-    
-    # Add other members
-    for user_id in data.get('members', []):
-        member = GroupMember(group_id=group.id, user_id=user_id, role='member')
-        db.session.add(member)
-    
-    db.session.commit()
-    return jsonify({'success': True, 'group_id': group.id})
-
-@app.route('/group_chat/<int:group_id>')
-@login_required
-def group_chat(group_id):
-    group = Group.query.get_or_404(group_id)
-    member = GroupMember.query.filter_by(group_id=group_id, user_id=current_user.id).first()
-    if not member:
-        return redirect(url_for('friends'))
-    
-    messages = GroupMessage.query.filter_by(group_id=group_id).order_by(GroupMessage.timestamp.asc()).all()
-    members = GroupMember.query.filter_by(group_id=group_id).all()
-    
-    return render_template('group_chat.html', group=group, messages=messages, members=members)
-
-@socketio.on('send_group_message')
-def handle_group_message(data):
-    if not current_user.is_authenticated:
-        return
-    
-    group_id = data.get('group_id')
-    content = data.get('message', '').strip()
-    
-    group = Group.query.get(group_id)
-    if not group:
-        return
-    
-    member = GroupMember.query.filter_by(group_id=group_id, user_id=current_user.id).first()
-    if not member:
-        return
-    
-    msg = GroupMessage(
-        group_id=group_id,
-        sender_id=current_user.id,
-        content=content
-    )
-    db.session.add(msg)
-    db.session.commit()
-    
-    payload = {
-        'message': content,
-        'sender': current_user.username,
-        'sender_id': current_user.id,
-        'timestamp': msg.timestamp.strftime('%H:%M'),
-        'msg_id': msg.id
-    }
-    
-    # Send to all group members
-    members = GroupMember.query.filter_by(group_id=group_id).all()
-    for member in members:
-        emit('receive_group_message', payload, room=f'user_{member.user_id}')
-
-# ── Voice Message Upload ──
-@app.route('/upload_voice', methods=['POST'])
-@login_required
-def upload_voice():
-    if 'voice' not in request.files:
-        return jsonify({'success': False, 'error': 'No voice file'})
-    
-    file = request.files['voice']
-    duration = request.form.get('duration', type=int)
-    receiver_id = request.form.get('receiver_id', type=int)
-    
-    try:
-        result = cloudinary.uploader.upload(
-            file,
-            folder='messaging_app_voice',
-            resource_type='auto'
-        )
-        
-        msg = Message(
-            sender_id=current_user.id,
-            receiver_id=receiver_id,
-            content='[VOICE]',
-            is_read=False
-        )
-        db.session.add(msg)
-        db.session.commit()
-        
-        voice_msg = VoiceMessage(
-            message_id=msg.id,
-            audio_url=result['secure_url'],
-            duration=duration
-        )
-        db.session.add(voice_msg)
-        db.session.commit()
-        
-        payload = {
-            'message': '[VOICE]',
-            'sender': current_user.username,
-            'sender_id': current_user.id,
-            'timestamp': msg.timestamp.strftime('%H:%M'),
-            'msg_id': msg.id,
-            'voice_url': result['secure_url'],
-            'duration': duration
-        }
-        
-        socketio.emit('receive_voice', payload, room=f'user_{receiver_id}')
-        socketio.emit('receive_voice', payload, room=f'user_{current_user.id}')
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-# ── Stories ──
-@app.route('/upload_story', methods=['POST'])
-@login_required
-def upload_story():
-    if 'story' not in request.files:
-        return jsonify({'success': False})
-    
-    file = request.files['story']
-    caption = request.form.get('caption', '')
-    
-    try:
-        result = cloudinary.uploader.upload(
-            file,
-            folder='messaging_app_stories',
-            transformation=[
-                {'width': 1080, 'height': 1920, 'crop': 'limit'}
-            ]
-        )
-        
-        story = Story(
-            user_id=current_user.id,
-            media_url=result['secure_url'],
-            media_type='image',
-            caption=caption
-        )
-        db.session.add(story)
-        db.session.commit()
-        
-        return jsonify({'success': True, 'story_id': story.id})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/stories')
-@login_required
-def view_stories():
-    # Get stories from friends
-    friends = current_user.get_friends()
-    stories_data = []
-    
-    for friend in friends:
-        stories = Story.query.filter(
-            Story.user_id == friend.id,
-            Story.expires_at > datetime.utcnow()
-        ).all()
-        
-        if stories:
-            stories_data.append({
-                'user': friend,
-                'stories': stories
-            })
-    
-    return render_template('stories.html', stories=stories_data)
-
-# ── Block User ──
-@app.route('/block_user/<int:user_id>', methods=['POST'])
-@login_required
-def block_user(user_id):
-    user_to_block = User.query.get_or_404(user_id)
-    
-    # Check if already blocked
-    existing = BlockedUser.query.filter_by(
-        user_id=current_user.id,
-        blocked_user_id=user_id
-    ).first()
-    
-    if not existing:
-        block = BlockedUser(user_id=current_user.id, blocked_user_id=user_id)
-        db.session.add(block)
-        db.session.commit()
-    
-    return jsonify({'success': True})
-
-@app.route('/unblock_user/<int:user_id>', methods=['POST'])
-@login_required
-def unblock_user(user_id):
-    block = BlockedUser.query.filter_by(
-        user_id=current_user.id,
-        blocked_user_id=user_id
-    ).first()
-    
-    if block:
-        db.session.delete(block)
-        db.session.commit()
-    
-    return jsonify({'success': True})
-
-# ── Archive Chat ──
-@app.route('/archive_chat', methods=['POST'])
-@login_required
-def archive_chat():
-    chat_type = request.json.get('chat_type')
-    chat_id = request.json.get('chat_id')
-    
-    archive = Archive(
-        user_id=current_user.id,
-        chat_type=chat_type,
-        chat_id=chat_id
-    )
-    db.session.add(archive)
-    db.session.commit()
-    
-    return jsonify({'success': True})
-
-@app.route('/unarchive_chat', methods=['POST'])
-@login_required
-def unarchive_chat():
-    chat_type = request.json.get('chat_type')
-    chat_id = request.json.get('chat_id')
-    
-    archive = Archive.query.filter_by(
-        user_id=current_user.id,
-        chat_type=chat_type,
-        chat_id=chat_id
-    ).first()
-    
-    if archive:
-        db.session.delete(archive)
-        db.session.commit()
-    
-    return jsonify({'success': True})

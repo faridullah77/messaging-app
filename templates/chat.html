@@ -36,13 +36,13 @@
 
     <div class="messages-container" id="messages-container">
         {% for msg in messages %}
-            <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %}" id="msg-{{ msg.id }}">
-                <div class="message-bubble">
+            <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %}" data-msg-id="{{ msg.id }}">
+                <div class="message-bubble" id="bubble-{{ msg.id }}">
                     <p style="margin:0;">{{ msg.content }}</p>
                     <div class="message-meta" style="justify-content: flex-end; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
                         <span class="message-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
                         {% if msg.sender_id == current_user.id %}
-                            <span class="tick {% if msg.is_read %}seen{% endif %}" style="color: {% if msg.is_read %}#34b7f1{% else %}#bbb{% endif %};">
+                            <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}" style="color: {% if msg.is_read %}#34b7f1{% else %}#bbb{% endif %};">
                                 {% if msg.is_read %}✓✓{% else %}✓{% endif %}
                             </span>
                         {% endif %}
@@ -63,12 +63,16 @@
 </div>
 
 <script>
+    // Define variables BEFORE loading chat.js
+    const FRIEND_ID = {{ friend.id }};
+    const CURRENT_USER_ID = {{ current_user.id }};
+    
     const container = document.getElementById('messages-container');
-    container.scrollTop = container.scrollHeight;
+    if (container) container.scrollTop = container.scrollHeight;
 
     // Listen for Real-time Status Changes
     socket.on('user_status_change', function(data) {
-        if (data.user_id == "{{ friend.id }}") {
+        if (data.user_id == {{ friend.id }}) {
             const statusText = document.getElementById('user-status-text');
             const statusDot = document.getElementById('status-dot');
             if (data.online) {
@@ -81,4 +85,5 @@
         }
     });
 </script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}

@@ -1,28 +1,66 @@
 const socket = io();
-const messageInput = document.getElementById('message-input');
-const sendBtn = document.getElementById('send-btn');
-const messagesContainer = document.getElementById('messages');
 
 let currentReplyId = null;
 let currentDeleteMsgId = null;
 let typingTimeout;
 
-// ── Scroll to bottom on load ──
-scrollToBottom();
+// Wait for DOM to load
+document.addEventListener('DOMContentLoaded', () => {
+    window.messageInput = document.getElementById('message-input');
+    window.sendBtn = document.getElementById('send-btn');
+    window.messagesContainer = document.getElementById('messages-container');
+    
+    if (window.sendBtn) {
+        window.sendBtn.addEventListener('click', sendMessage);
+    }
+    
+    if (window.messageInput) {
+        window.messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        window.messageInput.addEventListener('input', () => {
+            window.messageInput.style.height = 'auto';
+            window.messageInput.style.height = Math.min(window.messageInput.scrollHeight, 120) + 'px';
+            socket.emit('typing', { receiver_id: FRIEND_ID });
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('stop_typing', { receiver_id: FRIEND_ID });
+            }, 2000);
+        });
+    }
+    
+    scrollToBottom();
+    checkScrollButton();
+});
+
+// ── Send Message ──
+function sendMessage() {
+    if (!window.messageInput) return;
+    const message = window.messageInput.value.trim();
+    if (message === '') return;
+    
+    socket.emit('send_message', {
+        message: message,
+        receiver_id: FRIEND_ID,
+        reply_to_id: currentReplyId
+    });
+    
+    window.messageInput.value = '';
+    window.messageInput.style.height = 'auto';
+    window.messageInput.focus();
+    cancelReply();
+    socket.emit('stop_typing', { receiver_id: FRIEND_ID });
+}
 
 // ── Convert UTC to Local Time ──
 function formatLocalTime(utcString) {
     const date = new Date(utcString + 'Z');
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
 }
-
-document.querySelectorAll('.message-time[data-utc]').forEach(el => {
-    el.textContent = formatLocalTime(el.dataset.utc);
-});
-
-document.querySelectorAll('.last-seen-time[data-utc]').forEach(el => {
-    el.textContent = formatLocalTime(el.dataset.utc);
-});
 
 // ── Mark existing messages as seen ──
 document.querySelectorAll('.message.theirs[data-msg-id]').forEach(el => {
@@ -40,7 +78,7 @@ document.getElementById('image-input')?.addEventListener('change', (e) => {
     const uploadingEl = document.createElement('div');
     uploadingEl.classList.add('message', 'mine');
     uploadingEl.innerHTML = `<div class="message-bubble" style="opacity:0.6">📷 Uploading...</div>`;
-    messagesContainer.appendChild(uploadingEl);
+    window.messagesContainer.appendChild(uploadingEl);
     scrollToBottom();
     fetch('/upload_image', { method: 'POST', body: formData })
     .then(res => res.json())
@@ -64,7 +102,7 @@ document.getElementById('view-once-input')?.addEventListener('change', (e) => {
     const uploadingEl = document.createElement('div');
     uploadingEl.classList.add('message', 'mine');
     uploadingEl.innerHTML = `<div class="message-bubble" style="opacity:0.6">👁️ Uploading view once...</div>`;
-    messagesContainer.appendChild(uploadingEl);
+    window.messagesContainer.appendChild(uploadingEl);
     scrollToBottom();
     fetch('/upload_image', { method: 'POST', body: formData })
     .then(res => res.json())
@@ -96,41 +134,6 @@ socket.on('view_once_viewed', (data) => {
         const viewOnce = msgEl.querySelector('.view-once-tap, .view-once-sent');
         if (viewOnce) viewOnce.outerHTML = '<div class="view-once-viewed">👁️ Viewed</div>';
     }
-});
-
-// ── Send Message ──
-function sendMessage() {
-    const message = messageInput.value.trim();
-    if (message === '') return;
-    socket.emit('send_message', {
-        message: message,
-        receiver_id: FRIEND_ID,
-        reply_to_id: currentReplyId
-    });
-    messageInput.value = '';
-    messageInput.style.height = 'auto';
-    messageInput.focus();
-    cancelReply();
-    socket.emit('stop_typing', { receiver_id: FRIEND_ID });
-}
-
-sendBtn.addEventListener('click', sendMessage);
-messageInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-});
-
-// ── Auto resize textarea ──
-messageInput.addEventListener('input', () => {
-    messageInput.style.height = 'auto';
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
-    socket.emit('typing', { receiver_id: FRIEND_ID });
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-        socket.emit('stop_typing', { receiver_id: FRIEND_ID });
-    }, 2000);
 });
 
 socket.on('user_typing', (data) => {
@@ -183,7 +186,7 @@ socket.on('receive_message', (data) => {
         `<div class="message-bubble" id="bubble-${data.msg_id}">${renderContent(data.message)}</div>`;
 
     msgEl.innerHTML = `
-        ${!isMine ? `<span class="message-sender">${data.sender}</span>` : ''}
+        ${!isMine ? `<span class="message-sender">${escapeHtml(data.sender)}</span>` : ''}
         ${replyHtml}
         ${contentHtml}
         <div class="emoji-picker" id="picker-${data.msg_id}">
@@ -203,7 +206,7 @@ socket.on('receive_message', (data) => {
             <span class="reply-btn" onclick="setReply(${data.msg_id}, '${escapeHtml(data.message).substring(0, 50)}')">↩️</span>
         </div>
     `;
-    messagesContainer.appendChild(msgEl);
+    window.messagesContainer.appendChild(msgEl);
     scrollToBottom();
 });
 
@@ -270,7 +273,7 @@ function setReply(msgId, content) {
     currentReplyId = msgId;
     document.getElementById('reply-preview-text').textContent = content;
     document.getElementById('reply-preview').style.display = 'block';
-    messageInput.focus();
+    window.messageInput.focus();
 }
 
 function cancelReply() {
@@ -425,20 +428,23 @@ if (localStorage.getItem('theme') === 'light') {
 
 // ── Scroll to Bottom ──
 function scrollToBottom() {
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    if (window.messagesContainer) {
+        window.messagesContainer.scrollTop = window.messagesContainer.scrollHeight;
+    }
     const btn = document.getElementById('scroll-bottom-btn');
     if (btn) btn.style.display = 'none';
 }
 
 function checkScrollButton() {
     const btn = document.getElementById('scroll-bottom-btn');
-    if (!btn) return;
-    const distanceFromBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight;
+    if (!btn || !window.messagesContainer) return;
+    const distanceFromBottom = window.messagesContainer.scrollHeight - window.messagesContainer.scrollTop - window.messagesContainer.clientHeight;
     btn.style.display = distanceFromBottom > 200 ? 'flex' : 'none';
 }
 
-messagesContainer.addEventListener('scroll', checkScrollButton);
-setTimeout(checkScrollButton, 500);
+if (window.messagesContainer) {
+    window.messagesContainer.addEventListener('scroll', checkScrollButton);
+}
 
 // ── Render Content ──
 function renderContent(content) {
@@ -558,106 +564,4 @@ function showStats() {
 
 function closeStatsModal() {
     document.getElementById('stats-modal').style.display = 'none';
-}
-// Add to your existing chat.js
-
-let mediaRecorder;
-let audioChunks = [];
-let isRecording = false;
-let recordingStartTime;
-
-// Voice recording setup
-async function startVoiceRecording() {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        
-        mediaRecorder.ondataavailable = event => {
-            audioChunks.push(event.data);
-        };
-        
-        mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            const duration = Math.floor((Date.now() - recordingStartTime) / 1000);
-            await sendVoiceMessage(audioBlob, duration);
-            stream.getTracks().forEach(track => track.stop());
-        };
-        
-        mediaRecorder.start();
-        isRecording = true;
-        recordingStartTime = Date.now();
-        
-        // Update UI
-        const recordBtn = document.getElementById('voice-record-btn');
-        recordBtn.classList.add('recording');
-        recordBtn.innerHTML = '⏹️';
-        showRecordingTimer();
-        
-    } catch (err) {
-        console.error('Microphone access denied:', err);
-        alert('Microphone access needed for voice messages');
-    }
-}
-
-function stopVoiceRecording() {
-    if (mediaRecorder && isRecording) {
-        mediaRecorder.stop();
-        isRecording = false;
-        
-        const recordBtn = document.getElementById('voice-record-btn');
-        recordBtn.classList.remove('recording');
-        recordBtn.innerHTML = '🎤';
-        hideRecordingTimer();
-    }
-}
-
-async function sendVoiceMessage(audioBlob, duration) {
-    const formData = new FormData();
-    formData.append('voice', audioBlob);
-    formData.append('receiver_id', FRIEND_ID);
-    formData.append('duration', duration);
-    
-    const uploadingEl = document.createElement('div');
-    uploadingEl.classList.add('message', 'mine');
-    uploadingEl.innerHTML = `<div class="message-bubble" style="opacity:0.6">🎤 Uploading voice note...</div>`;
-    messagesContainer.appendChild(uploadingEl);
-    scrollToBottom();
-    
-    const response = await fetch('/upload_voice', {
-        method: 'POST',
-        body: formData
-    });
-    
-    const data = await response.json();
-    uploadingEl.remove();
-    
-    if (data.success) {
-        // Message sent successfully
-    } else {
-        alert('Failed to send voice message');
-    }
-}
-
-function showRecordingTimer() {
-    const timerDiv = document.createElement('div');
-    timerDiv.id = 'recording-timer';
-    timerDiv.className = 'recording-timer';
-    timerDiv.innerHTML = '🎤 Recording... 0s';
-    document.querySelector('.input-area').appendChild(timerDiv);
-    
-    const interval = setInterval(() => {
-        const seconds = Math.floor((Date.now() - recordingStartTime) / 1000);
-        const timer = document.getElementById('recording-timer');
-        if (timer) {
-            timer.innerHTML = `🎤 Recording... ${seconds}s`;
-        } else {
-            clearInterval(interval);
-        }
-    }, 1000);
-}
-
-function hideRecordingTimer() {
-    const timer = document.getElementById('recording-timer');
-    if (timer) timer.remove();
 }
