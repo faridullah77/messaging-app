@@ -83,3 +83,75 @@ class PushSubscription(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     subscription_json = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # Add these new models to your existing models.py
+
+class Group(db.Model):
+    __tablename__ = 'groups'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(200))
+    group_photo = db.Column(db.String(500))
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    members = db.relationship('GroupMember', backref='group', lazy='dynamic')
+    messages = db.relationship('GroupMessage', backref='group', lazy='dynamic')
+
+class GroupMember(db.Model):
+    __tablename__ = 'group_members'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'))
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    role = db.Column(db.String(20), default='member')  # admin, member
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class GroupMessage(db.Model):
+    __tablename__ = 'group_messages'
+    id = db.Column(db.Integer, primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('groups.id'))
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    content = db.Column(db.Text, nullable=False)
+    message_type = db.Column(db.String(20), default='text')  # text, voice, image, video
+    media_url = db.Column(db.String(500))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    is_deleted = db.Column(db.Boolean, default=False)
+    
+class VoiceMessage(db.Model):
+    __tablename__ = 'voice_messages'
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('messages.id'))
+    audio_url = db.Column(db.String(500))
+    duration = db.Column(db.Integer)  # seconds
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class BlockedUser(db.Model):
+    __tablename__ = 'blocked_users'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    blocked_user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Archive(db.Model):
+    __tablename__ = 'archives'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    chat_type = db.Column(db.String(20))  # 'user' or 'group'
+    chat_id = db.Column(db.Integer)
+    archived_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Story(db.Model):
+    __tablename__ = 'stories'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    media_url = db.Column(db.String(500))
+    media_type = db.Column(db.String(20))  # image, video
+    caption = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(hours=24))
+    
+class StoryView(db.Model):
+    __tablename__ = 'story_views'
+    id = db.Column(db.Integer, primary_key=True)
+    story_id = db.Column(db.Integer, db.ForeignKey('stories.id'))
+    viewer_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    viewed_at = db.Column(db.DateTime, default=datetime.utcnow)

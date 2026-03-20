@@ -559,3 +559,105 @@ function showStats() {
 function closeStatsModal() {
     document.getElementById('stats-modal').style.display = 'none';
 }
+// Add to your existing chat.js
+
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+let recordingStartTime;
+
+// Voice recording setup
+async function startVoiceRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = event => {
+            audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const duration = Math.floor((Date.now() - recordingStartTime) / 1000);
+            await sendVoiceMessage(audioBlob, duration);
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start();
+        isRecording = true;
+        recordingStartTime = Date.now();
+        
+        // Update UI
+        const recordBtn = document.getElementById('voice-record-btn');
+        recordBtn.classList.add('recording');
+        recordBtn.innerHTML = '⏹️';
+        showRecordingTimer();
+        
+    } catch (err) {
+        console.error('Microphone access denied:', err);
+        alert('Microphone access needed for voice messages');
+    }
+}
+
+function stopVoiceRecording() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        isRecording = false;
+        
+        const recordBtn = document.getElementById('voice-record-btn');
+        recordBtn.classList.remove('recording');
+        recordBtn.innerHTML = '🎤';
+        hideRecordingTimer();
+    }
+}
+
+async function sendVoiceMessage(audioBlob, duration) {
+    const formData = new FormData();
+    formData.append('voice', audioBlob);
+    formData.append('receiver_id', FRIEND_ID);
+    formData.append('duration', duration);
+    
+    const uploadingEl = document.createElement('div');
+    uploadingEl.classList.add('message', 'mine');
+    uploadingEl.innerHTML = `<div class="message-bubble" style="opacity:0.6">🎤 Uploading voice note...</div>`;
+    messagesContainer.appendChild(uploadingEl);
+    scrollToBottom();
+    
+    const response = await fetch('/upload_voice', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const data = await response.json();
+    uploadingEl.remove();
+    
+    if (data.success) {
+        // Message sent successfully
+    } else {
+        alert('Failed to send voice message');
+    }
+}
+
+function showRecordingTimer() {
+    const timerDiv = document.createElement('div');
+    timerDiv.id = 'recording-timer';
+    timerDiv.className = 'recording-timer';
+    timerDiv.innerHTML = '🎤 Recording... 0s';
+    document.querySelector('.input-area').appendChild(timerDiv);
+    
+    const interval = setInterval(() => {
+        const seconds = Math.floor((Date.now() - recordingStartTime) / 1000);
+        const timer = document.getElementById('recording-timer');
+        if (timer) {
+            timer.innerHTML = `🎤 Recording... ${seconds}s`;
+        } else {
+            clearInterval(interval);
+        }
+    }, 1000);
+}
+
+function hideRecordingTimer() {
+    const timer = document.getElementById('recording-timer');
+    if (timer) timer.remove();
+}
