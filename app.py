@@ -2,11 +2,11 @@ import eventlet
 eventlet.monkey_patch()
 
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, FriendRequest, Message, Reaction, PushSubscription
+from models import db, User, FriendRequest, Message, Reaction, PushSubscription, Friendship
 from datetime import datetime, timedelta
 from flask_mail import Mail, Message as MailMessage
 from itsdangerous import URLSafeTimedSerializer
@@ -16,8 +16,14 @@ from pywebpush import webpush, WebPushException
 import json
 
 app = Flask(__name__)
+
+# Get environment
+PRODUCTION = os.environ.get('PRODUCTION', 'False') == 'True'
+
+# Configuration
 app.secret_key = os.environ.get('SECRET_KEY', 'supersecretkey123')
 
+# Database URL
 database_url = os.environ.get('DATABASE_URL', '')
 print(f"DATABASE_URL found: {bool(database_url)}")
 if not database_url:
@@ -27,7 +33,10 @@ if database_url.startswith('postgres://'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-# ── Mail Config ──
+app.config['SESSION_COOKIE_SECURE'] = PRODUCTION
+app.config['REMEMBER_COOKIE_SECURE'] = PRODUCTION
+
+# Mail Config
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
@@ -37,25 +46,87 @@ app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_EMAIL')
 
 mail = Mail(app)
 serializer = URLSafeTimedSerializer(app.secret_key)
-# ── Cloudinary Config ──
+
+# Cloudinary Config
 cloudinary.config(
     cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
     api_key=os.environ.get('CLOUDINARY_API_KEY'),
     api_secret=os.environ.get('CLOUDINARY_API_SECRET')
 )
-# ── VAPID Config ──
+
+# VAPID Config
 VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
 VAPID_EMAIL = os.environ.get('VAPID_EMAIL', 'mailto:test@test.com')
 
 db.init_app(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Socket.IO configuration for production
+if PRODUCTION:
+    socketio = SocketIO(
+        app, 
+        cors_allowed_origins="*",
+        async_mode='eventlet',
+        logger=True,
+        engineio_logger=True,
+        ping_timeout=60,
+        ping_interval=25
+    )
+else:
+    socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+# ── Helper Functions ──
+def get_last_seen_text(last_seen_time):
+    if not last_seen_time:
+        return "Offline"
+    
+    now = datetime.utcnow()
+    diff = now - last_seen_time
+
+    if diff < timedelta(minutes=1):
+        return "Just now"
+    if diff < timedelta(hours=1):
+        return f"{int(diff.seconds / 60)}m ago"
+    if diff < timedelta(days=1):
+        return f"{int(diff.seconds / 3600)}h ago"
+    if diff < timedelta(days=2):
+        return "Yesterday"
+    
+    return last_seen_time.strftime('%b %d')
+
+def get_reactions_for_message(msg_id):
+    reactions = Reaction.query.filter_by(message_id=msg_id).all()
+    result = {}
+    for r in reactions:
+        result[r.emoji] = result.get(r.emoji, 0) + 1
+    return result
+
+def send_push_notification(user_id, title, body):
+    subscriptions = PushSubscription.query.filter_by(user_id=user_id).all()
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info=json.loads(sub.subscription_json),
+                data=json.dumps({'title': title, 'body': body}),
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={'sub': VAPID_EMAIL}
+            )
+        except WebPushException as e:
+            print(f"Push notification failed: {e}")
+            if '410' in str(e):
+                db.session.delete(sub)
+                db.session.commit()
+
+@app.context_processor
+def utility_processor():
+    return dict(get_last_seen_text=get_last_seen_text)
 
 # ── Auth Routes ──
 @app.route('/')
@@ -96,7 +167,9 @@ def signup():
             user = User(
                 username=username,
                 email=email,
-                password=generate_password_hash(password)
+                password=generate_password_hash(password),
+                avatar_url='https://res.cloudinary.com/demo/image/upload/v1/sample.jpg',
+                theme='light'
             )
             db.session.add(user)
             db.session.commit()
@@ -128,7 +201,8 @@ def friends():
         count = Message.query.filter_by(
             sender_id=friend.id,
             receiver_id=current_user.id,
-            is_read=False
+            is_read=False,
+            is_deleted=False
         ).count()
         unread_counts[friend.id] = count
     return render_template('friends.html',
@@ -151,6 +225,7 @@ def search_users():
         results.append({
             'id': user.id,
             'username': user.username,
+            'avatar_url': user.avatar_url,
             'is_online': user.is_online,
             'is_friend': current_user.is_friend_with(user),
             'has_pending': current_user.has_pending_request(user)
@@ -165,15 +240,32 @@ def send_request(user_id):
         req = FriendRequest(sender_id=current_user.id, receiver_id=user_id)
         db.session.add(req)
         db.session.commit()
+        socketio.emit('friend_request', {
+            'request_id': req.id,
+            'sender': current_user.username,
+            'sender_id': current_user.id,
+            'sender_avatar': current_user.avatar_url
+        }, room=f'user_{user_id}')
     return jsonify({'success': True})
 
 @app.route('/accept_request/<int:request_id>', methods=['POST'])
 @login_required
 def accept_request(request_id):
     req = FriendRequest.query.get_or_404(request_id)
-    if req.receiver_id == current_user.id:
+    if req.receiver_id == current_user.id and req.status == 'pending':
         req.status = 'accepted'
+        friendship1 = Friendship(user_id=req.sender_id, friend_id=req.receiver_id)
+        friendship2 = Friendship(user_id=req.receiver_id, friend_id=req.sender_id)
+        db.session.add(friendship1)
+        db.session.add(friendship2)
         db.session.commit()
+        
+        socketio.emit('friend_request_accepted', {
+            'user_id': req.sender_id,
+            'friend_id': current_user.id,
+            'friend_username': current_user.username
+        }, room=f'user_{req.sender_id}')
+        
     return redirect(url_for('friends'))
 
 @app.route('/reject_request/<int:request_id>', methods=['POST'])
@@ -185,7 +277,7 @@ def reject_request(request_id):
         db.session.commit()
     return redirect(url_for('friends'))
 
-# ── Chat Route ──
+# ── Chat Routes ──
 @app.route('/chat/<int:friend_id>')
 @login_required
 def chat(friend_id):
@@ -193,18 +285,18 @@ def chat(friend_id):
     if not current_user.is_friend_with(friend):
         return redirect(url_for('friends'))
 
-    # Mark all messages from this friend as READ when I open the chat
+    # Mark unread messages as read
     unread_messages = Message.query.filter_by(
         sender_id=friend_id,
         receiver_id=current_user.id,
-        is_read=False
+        is_read=False,
+        is_deleted=False
     ).all()
 
     if unread_messages:
         for msg in unread_messages:
             msg.is_read = True
             msg.read_at = datetime.utcnow()
-            # Notify the sender that I've read their messages
             socketio.emit('message_read', {
                 'msg_id': msg.id,
                 'read_at': msg.read_at.isoformat()
@@ -213,12 +305,44 @@ def chat(friend_id):
 
     messages = Message.query.filter(
         ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
-        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id))
+        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id)),
+        Message.is_deleted == False
     ).order_by(Message.timestamp.asc()).all()
 
     return render_template('chat.html', friend=friend, messages=messages)
 
-# ── Search Messages ──
+@app.route('/get_messages/<int:friend_id>')
+@login_required
+def get_messages(friend_id):
+    friend = User.query.get_or_404(friend_id)
+    
+    if not current_user.is_friend_with(friend):
+        return jsonify({'error': 'Not friends'}), 403
+    
+    messages = Message.query.filter(
+        ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
+        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id)),
+        Message.is_deleted == False
+    ).order_by(Message.timestamp.asc()).all()
+    
+    messages_data = []
+    for msg in messages:
+        sender = User.query.get(msg.sender_id)
+        messages_data.append({
+            'id': msg.id,
+            'sender_id': msg.sender_id,
+            'receiver_id': msg.receiver_id,
+            'content': msg.content,
+            'timestamp': msg.timestamp.strftime('%H:%M'),
+            'created_at': msg.timestamp.isoformat(),
+            'sender_username': sender.username,
+            'sender_avatar': sender.avatar_url,
+            'is_edited': msg.is_edited if hasattr(msg, 'is_edited') else False,
+            'is_read': msg.is_read
+        })
+    
+    return jsonify(messages_data)
+
 @app.route('/search_messages/<int:friend_id>')
 @login_required
 def search_messages(friend_id):
@@ -241,7 +365,7 @@ def search_messages(friend_id):
         })
     return jsonify(results)
 
-# ── Delete Message ──
+# ── Message Actions ──
 @app.route('/delete_message/<int:msg_id>', methods=['POST'])
 @login_required
 def delete_message(msg_id):
@@ -261,7 +385,31 @@ def delete_message(msg_id):
         db.session.commit()
     return jsonify({'success': True})
 
-# ── Reactions ──
+@app.route('/edit_message/<int:msg_id>', methods=['POST'])
+@login_required
+def edit_message(msg_id):
+    msg = Message.query.get_or_404(msg_id)
+    if msg.sender_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+    if msg.is_deleted:
+        return jsonify({'success': False, 'error': 'Cannot edit deleted message'})
+    new_content = request.json.get('content', '').strip()
+    if not new_content:
+        return jsonify({'success': False, 'error': 'Empty message'})
+    msg.content = new_content
+    msg.is_edited = True
+    db.session.commit()
+    other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+    socketio.emit('message_edited', {
+        'msg_id': msg_id,
+        'new_content': new_content
+    }, room=f'user_{other_id}')
+    socketio.emit('message_edited', {
+        'msg_id': msg_id,
+        'new_content': new_content
+    }, room=f'user_{current_user.id}')
+    return jsonify({'success': True})
+
 @app.route('/react/<int:msg_id>', methods=['POST'])
 @login_required
 def react_message(msg_id):
@@ -281,58 +429,16 @@ def react_message(msg_id):
     reaction = Reaction(message_id=msg_id, user_id=current_user.id, emoji=emoji)
     db.session.add(reaction)
     db.session.commit()
+    
+    msg = Message.query.get(msg_id)
+    if msg:
+        other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+        socketio.emit('reaction_updated', {
+            'msg_id': msg_id,
+            'reactions': get_reactions_for_message(msg_id)
+        }, room=f'user_{other_id}')
+    
     return jsonify({'success': True, 'action': 'added'})
-
-# ── Forgot Password ──
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip()
-        user = User.query.filter_by(email=email).first()
-        if user:
-            token = serializer.dumps(email, salt='password-reset')
-            reset_url = url_for('reset_password', token=token, _external=True)
-            msg = MailMessage(
-                subject='Password Reset - Messenger App',
-                recipients=[email],
-                body=f'''Hi {user.username}!
-
-Click the link below to reset your password:
-{reset_url}
-
-This link will expire in 1 hour.
-
-If you did not request a password reset, ignore this email.
-'''
-            )
-            mail.send(msg)
-        flash('Agar email registered hai toh reset link bhej diya gaya hai!')
-        return redirect(url_for('forgot_password'))
-    return render_template('forgot_password.html')
-
-@app.route('/reset_password/<token>', methods=['GET', 'POST'])
-def reset_password(token):
-    try:
-        email = serializer.loads(token, salt='password-reset', max_age=3600)
-    except:
-        flash('Reset link expired ya invalid hai!')
-        return redirect(url_for('forgot_password'))
-    if request.method == 'POST':
-        password = request.form.get('password', '')
-        confirm = request.form.get('confirm_password', '')
-        if password != confirm:
-            flash('Passwords match nahi kar rahe!')
-            return render_template('reset_password.html', token=token)
-        if len(password) < 6:
-            flash('Password kam az kam 6 characters ka hona chahiye!')
-            return render_template('reset_password.html', token=token)
-        user = User.query.filter_by(email=email).first()
-        if user:
-            user.password = generate_password_hash(password)
-            db.session.commit()
-            flash('Password reset ho gaya! Ab login karo.')
-            return redirect(url_for('login'))
-    return render_template('reset_password.html', token=token)
 
 # ── Image Upload ──
 @app.route('/upload_image', methods=['POST'])
@@ -352,19 +458,24 @@ def upload_image():
         )
         image_url = result['secure_url']
         receiver_id = request.form.get('receiver_id', type=int)
+        view_once = request.form.get('view_once') == 'true'
+        
         receiver = User.query.get(receiver_id)
         if not receiver or not current_user.is_friend_with(receiver):
             return jsonify({'success': False, 'error': 'Unauthorized'})
-        view_once = request.form.get('view_once') == 'true'
+        
         msg = Message(
             sender_id=current_user.id,
             receiver_id=receiver_id,
             content=f'[IMAGE]{image_url}[/IMAGE]',
             is_read=False,
-            view_once=view_once
+            view_once=view_once,
+            is_deleted=False,
+            is_edited=False
         )
         db.session.add(msg)
         db.session.commit()
+        
         payload = {
             'message': f'[IMAGE]{image_url}[/IMAGE]',
             'sender': current_user.username,
@@ -373,130 +484,16 @@ def upload_image():
             'msg_id': msg.id,
             'is_read': False,
             'reply_preview': None,
-            'view_once': view_once
+            'view_once': view_once,
+            'sender_avatar': current_user.avatar_url
         }
         socketio.emit('receive_message', payload, room=f'user_{receiver_id}')
         socketio.emit('receive_message', payload, room=f'user_{current_user.id}')
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'msg_id': msg.id})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-# ── Edit Message ──
-@app.route('/edit_message/<int:msg_id>', methods=['POST'])
-@login_required
-def edit_message(msg_id):
-    msg = Message.query.get_or_404(msg_id)
-    if msg.sender_id != current_user.id:
-        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
-    if msg.is_deleted:
-        return jsonify({'success': False, 'error': 'Deleted message edit nahi ho sakta'})
-    new_content = request.json.get('content', '').strip()
-    if not new_content:
-        return jsonify({'success': False, 'error': 'Empty message'})
-    msg.content = new_content
-    msg.is_edited = True
-    db.session.commit()
-    other_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
-    socketio.emit('message_edited', {
-        'msg_id': msg_id,
-        'new_content': new_content
-    }, room=f'user_{other_id}')
-    socketio.emit('message_edited', {
-        'msg_id': msg_id,
-        'new_content': new_content
-    }, room=f'user_{current_user.id}')
-    return jsonify({'success': True})
-
-# ── Push Notifications ──
-@app.route('/get_vapid_public_key')
-def get_vapid_public_key():
-    return jsonify({'public_key': VAPID_PUBLIC_KEY})
-
-@app.route('/save_subscription', methods=['POST'])
-@login_required
-def save_subscription():
-    subscription = request.json
-    if not subscription:
-        return jsonify({'success': False})
-    PushSubscription.query.filter_by(user_id=current_user.id).delete()
-    sub = PushSubscription(
-        user_id=current_user.id,
-        subscription_json=json.dumps(subscription)
-    )
-    db.session.add(sub)
-    db.session.commit()
-    return jsonify({'success': True})
-
-def send_push_notification(user_id, title, body):
-    subscriptions = PushSubscription.query.filter_by(user_id=user_id).all()
-    for sub in subscriptions:
-        try:
-            webpush(
-                subscription_info=json.loads(sub.subscription_json),
-                data=json.dumps({'title': title, 'body': body}),
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims={'sub': VAPID_EMAIL}
-            )
-        except WebPushException as e:
-            print(f"Push notification failed: {e}")
-            if '410' in str(e):
-                db.session.delete(sub)
-                db.session.commit()
-
-# ── Upload Avatar ──
-@app.route('/upload_avatar', methods=['POST'])
-@login_required
-def upload_avatar():
-    if 'avatar' not in request.files:
-        return jsonify({'success': False, 'error': 'No image'})
-    file = request.files['avatar']
-    if file.filename == '':
-        return jsonify({'success': False, 'error': 'No file selected'})
-    try:
-        result = cloudinary.uploader.upload(
-            file,
-            folder='farasma_avatars',
-            allowed_formats=['jpg', 'jpeg', 'png', 'webp'],
-            max_bytes=2000000,
-            transformation=[
-                {'width': 200, 'height': 200, 'crop': 'fill', 'gravity': 'face'}
-            ]
-        )
-        current_user.avatar_url = result['secure_url']
-        db.session.commit()
-        return jsonify({'success': True, 'avatar_url': current_user.avatar_url})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-# ── Update Bio ──
-@app.route('/update_bio', methods=['POST'])
-@login_required
-def update_bio():
-    bio = request.json.get('bio', '').strip()
-    if len(bio) > 150:
-        return jsonify({'success': False, 'error': 'Bio 150 characters se zyada nahi ho sakti'})
-    current_user.bio = bio
-    db.session.commit()
-    return jsonify({'success': True})
-
-# ── View Once ──
-@app.route('/view_once/<int:msg_id>', methods=['POST'])
-@login_required
-def view_once_image(msg_id):
-    msg = Message.query.get_or_404(msg_id)
-    if msg.receiver_id != current_user.id:
-        return jsonify({'success': False, 'error': 'Unauthorized'})
-    if msg.view_once and not msg.viewed:
-        msg.viewed = True
-        msg.content = '[VIEW_ONCE_VIEWED]'
-        db.session.commit()
-        other_id = msg.sender_id
-        socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{other_id}')
-        socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{current_user.id}')
-        return jsonify({'success': True})
-    return jsonify({'success': False})
-
-# ── Profile Page ──
+# ── Profile Routes ──
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
@@ -535,13 +532,13 @@ def profile():
             new_password = request.form.get('new_password', '')
             confirm_password = request.form.get('confirm_password', '')
             if not check_password_hash(current_user.password, old_password):
-                flash('Current password galat hai!')
+                flash('Current password is incorrect!')
                 return redirect(url_for('profile'))
             if new_password != confirm_password:
-                flash('Naye passwords match nahi kar rahe!')
+                flash('New passwords do not match!')
                 return redirect(url_for('profile'))
             if len(new_password) < 6:
-                flash('Password kam az kam 6 characters ka hona chahiye!')
+                flash('Password must be at least 6 characters!')
                 return redirect(url_for('profile'))
             current_user.password = generate_password_hash(new_password)
             db.session.commit()
@@ -550,7 +547,73 @@ def profile():
         return redirect(url_for('profile'))
     return render_template('profile.html')
 
-# ── Message Statistics ──
+@app.route('/upload_avatar', methods=['POST'])
+@login_required
+def upload_avatar():
+    if 'avatar' not in request.files:
+        return jsonify({'success': False, 'error': 'No image'})
+    file = request.files['avatar']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No file selected'})
+    try:
+        result = cloudinary.uploader.upload(
+            file,
+            folder='avatars',
+            allowed_formats=['jpg', 'jpeg', 'png', 'webp'],
+            max_bytes=2000000,
+            transformation=[
+                {'width': 200, 'height': 200, 'crop': 'fill', 'gravity': 'face'}
+            ]
+        )
+        current_user.avatar_url = result['secure_url']
+        db.session.commit()
+        return jsonify({'success': True, 'avatar_url': current_user.avatar_url})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/update_bio', methods=['POST'])
+@login_required
+def update_bio():
+    bio = request.json.get('bio', '').strip()
+    if len(bio) > 150:
+        return jsonify({'success': False, 'error': 'Bio cannot exceed 150 characters'})
+    current_user.bio = bio
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/update_theme', methods=['POST'])
+@login_required
+def update_theme():
+    theme = request.form.get('theme')
+    if theme in ['light', 'dark']:
+        current_user.theme = theme
+        db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/set_wallpaper/<int:friend_id>', methods=['POST'])
+@login_required
+def set_wallpaper(friend_id):
+    data = request.get_json()
+    wallpaper_url = data.get('wallpaper')
+    session[f'wallpaper_{friend_id}'] = wallpaper_url
+    return jsonify({'success': True})
+
+@app.route('/view_once/<int:msg_id>', methods=['POST'])
+@login_required
+def view_once_image(msg_id):
+    msg = Message.query.get_or_404(msg_id)
+    if msg.receiver_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Unauthorized'})
+    if msg.view_once and not msg.viewed:
+        msg.viewed = True
+        msg.content = '[VIEW_ONCE_VIEWED]'
+        db.session.commit()
+        other_id = msg.sender_id
+        socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{other_id}')
+        socketio.emit('view_once_viewed', {'msg_id': msg_id}, room=f'user_{current_user.id}')
+        return jsonify({'success': True})
+    return jsonify({'success': False})
+
 @app.route('/stats/<int:friend_id>')
 @login_required
 def message_stats(friend_id):
@@ -558,29 +621,34 @@ def message_stats(friend_id):
     
     sent = Message.query.filter_by(
         sender_id=current_user.id,
-        receiver_id=friend_id
+        receiver_id=friend_id,
+        is_deleted=False
     ).count()
 
     received = Message.query.filter_by(
         sender_id=friend_id,
-        receiver_id=current_user.id
+        receiver_id=current_user.id,
+        is_deleted=False
     ).count()
 
     sent_images = Message.query.filter(
         Message.sender_id == current_user.id,
         Message.receiver_id == friend_id,
-        Message.content.like('%[IMAGE]%')
+        Message.content.like('%[IMAGE]%'),
+        Message.is_deleted == False
     ).count()
 
     received_images = Message.query.filter(
         Message.sender_id == friend_id,
         Message.receiver_id == current_user.id,
-        Message.content.like('%[IMAGE]%')
+        Message.content.like('%[IMAGE]%'),
+        Message.is_deleted == False
     ).count()
 
     first_msg = Message.query.filter(
         ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
-        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id))
+        ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id)),
+        Message.is_deleted == False
     ).order_by(Message.timestamp.asc()).first()
 
     days_chatting = 0
@@ -597,28 +665,76 @@ def message_stats(friend_id):
         'friend_username': friend.username
     })
 
-# ── Last Seen Helper ──
-def get_last_seen_text(last_seen_time):
-    if not last_seen_time:
-        return "Offline"
-    
-    now = datetime.utcnow()
-    diff = now - last_seen_time
+# ── Forgot Password ──
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token = serializer.dumps(email, salt='password-reset')
+            reset_url = url_for('reset_password', token=token, _external=True)
+            msg = MailMessage(
+                subject='Password Reset - Messenger App',
+                recipients=[email],
+                body=f'''Hi {user.username}!
 
-    if diff < timedelta(minutes=1):
-        return "Just now"
-    if diff < timedelta(hours=1):
-        return f"{int(diff.seconds / 60)}m ago"
-    if diff < timedelta(days=1):
-        return f"{int(diff.seconds / 3600)}h ago"
-    if diff < timedelta(days=2):
-        return "Yesterday"
-    
-    return last_seen_time.strftime('%b %d')
+Click the link below to reset your password:
+{reset_url}
 
-@app.context_processor
-def utility_processor():
-    return dict(get_last_seen_text=get_last_seen_text)
+This link will expire in 1 hour.
+
+If you did not request a password reset, ignore this email.
+'''
+            )
+            mail.send(msg)
+        flash('If email is registered, reset link has been sent!')
+        return redirect(url_for('forgot_password'))
+    return render_template('forgot_password.html')
+
+@app.route('/reset_password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    try:
+        email = serializer.loads(token, salt='password-reset', max_age=3600)
+    except:
+        flash('Reset link expired or invalid!')
+        return redirect(url_for('forgot_password'))
+    if request.method == 'POST':
+        password = request.form.get('password', '')
+        confirm = request.form.get('confirm_password', '')
+        if password != confirm:
+            flash('Passwords do not match!')
+            return render_template('reset_password.html', token=token)
+        if len(password) < 6:
+            flash('Password must be at least 6 characters!')
+            return render_template('reset_password.html', token=token)
+        user = User.query.filter_by(email=email).first()
+        if user:
+            user.password = generate_password_hash(password)
+            db.session.commit()
+            flash('Password reset successful! Please login.')
+            return redirect(url_for('login'))
+    return render_template('reset_password.html', token=token)
+
+# ── Push Notifications ──
+@app.route('/get_vapid_public_key')
+def get_vapid_public_key():
+    return jsonify({'public_key': VAPID_PUBLIC_KEY})
+
+@app.route('/save_subscription', methods=['POST'])
+@login_required
+def save_subscription():
+    subscription = request.json
+    if not subscription:
+        return jsonify({'success': False})
+    PushSubscription.query.filter_by(user_id=current_user.id).delete()
+    sub = PushSubscription(
+        user_id=current_user.id,
+        subscription_json=json.dumps(subscription)
+    )
+    db.session.add(sub)
+    db.session.commit()
+    return jsonify({'success': True})
 
 # ── Socket Events ──
 @socketio.on('connect')
@@ -627,6 +743,10 @@ def handle_connect():
         current_user.is_online = True
         db.session.commit()
         join_room(f'user_{current_user.id}')
+        socketio.emit('user_status', {
+            'user_id': current_user.id,
+            'status': 'online'
+        }, broadcast=True)
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -634,6 +754,10 @@ def handle_disconnect():
         current_user.is_online = False
         current_user.last_seen = datetime.utcnow()
         db.session.commit()
+        socketio.emit('user_status', {
+            'user_id': current_user.id,
+            'status': 'offline'
+        }, broadcast=True)
 
 @socketio.on('send_message')
 def handle_message(data):
@@ -652,14 +776,16 @@ def handle_message(data):
         receiver_id=receiver_id,
         content=content,
         is_read=False,
-        reply_to_id=reply_to_id
+        reply_to_id=reply_to_id,
+        is_deleted=False,
+        is_edited=False
     )
     db.session.add(msg)
     db.session.commit()
     reply_preview = None
     if reply_to_id:
         reply_msg = Message.query.get(reply_to_id)
-        if reply_msg:
+        if reply_msg and not reply_msg.is_deleted:
             reply_preview = {
                 'content': reply_msg.content[:50],
                 'sender_id': reply_msg.sender_id
@@ -671,7 +797,8 @@ def handle_message(data):
         'timestamp': msg.timestamp.strftime('%H:%M'),
         'msg_id': msg.id,
         'is_read': False,
-        'reply_preview': reply_preview
+        'reply_preview': reply_preview,
+        'sender_avatar': current_user.avatar_url
     }
     emit('receive_message', payload, room=f'user_{receiver_id}')
     emit('receive_message', payload, room=f'user_{current_user.id}')
@@ -690,7 +817,7 @@ def handle_message_seen(data):
         return
     msg_id = data.get('msg_id')
     msg = Message.query.get(msg_id)
-    if msg and msg.receiver_id == current_user.id:
+    if msg and msg.receiver_id == current_user.id and not msg.is_read:
         msg.is_read = True
         msg.read_at = datetime.utcnow()
         db.session.commit()
@@ -707,7 +834,7 @@ def handle_reaction(data):
     msg_id = data.get('msg_id')
     emoji = data.get('emoji')
     msg = Message.query.get(msg_id)
-    if not msg:
+    if not msg or msg.is_deleted:
         return
     existing = Reaction.query.filter_by(
         message_id=msg_id,
@@ -724,12 +851,10 @@ def handle_reaction(data):
         reaction = Reaction(message_id=msg_id, user_id=current_user.id, emoji=emoji)
         db.session.add(reaction)
         db.session.commit()
-    reactions = Reaction.query.filter_by(message_id=msg_id).all()
-    result = {}
-    for r in reactions:
-        result[r.emoji] = result.get(r.emoji, 0) + 1
+    
+    reactions = get_reactions_for_message(msg_id)
     other_user_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
-    payload = {'msg_id': msg_id, 'reactions': result}
+    payload = {'msg_id': msg_id, 'reactions': reactions}
     emit('reaction_updated', payload, room=f'user_{current_user.id}')
     emit('reaction_updated', payload, room=f'user_{other_user_id}')
 
@@ -755,4 +880,11 @@ def handle_stop_typing(data):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    socketio.run(app, debug=True)
+    
+    # Get port from environment for Railway
+    port = int(os.environ.get('PORT', 5000))
+    
+    if PRODUCTION:
+        socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    else:
+        socketio.run(app, debug=True, host='0.0.0.0', port=port)

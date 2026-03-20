@@ -1,150 +1,82 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Profile — Farasma{% endblock %}
+{% block title %}Profile{% endblock %}
 
 {% block content %}
-<div style="min-height:100vh; background: linear-gradient(135deg, #128c7e, #25d366); display:flex; align-items:center; justify-content:center; padding: 20px;">
-<div style="background:#fff; border-radius:20px; padding:32px; width:100%; max-width:480px; box-shadow: 0 20px 60px rgba(0,0,0,0.15);">
-
-    <!-- Header -->
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:24px;">
-        <a href="/friends" style="color:#667781; text-decoration:none; font-size:20px;">←</a>
-        <h1 style="font-size:20px; font-weight:700; color:#111b21;">Edit Profile</h1>
-    </div>
-
-    <!-- Avatar Section -->
-    <div style="text-align:center; margin-bottom:28px;">
-        <div style="position:relative; display:inline-block;">
-            {% if current_user.avatar_url %}
-            <img src="{{ current_user.avatar_url }}" id="profile-avatar-img"
-                 style="width:90px; height:90px; border-radius:50%; object-fit:cover; border:3px solid #25d366;"/>
-            {% else %}
-            <div id="profile-avatar-text"
-                 style="width:90px; height:90px; border-radius:50%; background:linear-gradient(135deg,#128c7e,#25d366); display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:700; color:#fff; margin:0 auto;">
-                {{ current_user.username[0].upper() }}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-user-circle"></i> Your Profile</h3>
             </div>
-            {% endif %}
-            <label style="position:absolute; bottom:0; right:0; background:#25d366; border-radius:50%; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; border:2px solid #fff; font-size:14px;">
-                📷
-                <input type="file" id="profile-avatar-input" accept="image/*" style="display:none"/>
-            </label>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="text-center mb-4">
+                        <img src="{{ user.avatar }}" class="rounded-circle" width="150" height="150" id="avatar-preview">
+                        <div class="mt-2">
+                            <input type="file" name="avatar" id="avatar-upload" accept="image/*" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" value="{{ user.email }}" disabled>
+                        <small class="text-muted">Email cannot be changed</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="bio" class="form-label">Bio</label>
+                        <textarea class="form-control" id="bio" name="bio" rows="3">{{ user.bio }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Theme Preference</label>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary" onclick="toggleTheme()">
+                                <i class="fas fa-moon"></i> Toggle Theme
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Update Profile
+                    </button>
+                </form>
+            </div>
         </div>
-        <p style="margin-top:8px; font-size:12px; color:#667781;">Tap to change DP</p>
-        <div id="upload-status" style="font-size:12px; color:#25d366; margin-top:4px;"></div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4><i class="fas fa-chart-line"></i> Statistics</h4>
+            </div>
+            <div class="card-body">
+                <p><strong>Member since:</strong> {{ user.created_at.strftime('%B %d, %Y') }}</p>
+                <p><strong>Last seen:</strong> {{ user.last_seen.strftime('%Y-%m-%d %H:%M') if user.last_seen else 'Never' }}</p>
+                <p><strong>Friends:</strong> <span id="friend-count">Loading...</span></p>
+            </div>
+        </div>
     </div>
-
-    <!-- Update Profile Form -->
-    <div style="margin-bottom:24px;">
-        <h3 style="font-size:14px; font-weight:600; color:#667781; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Profile Info</h3>
-        <form method="POST" action="/profile">
-            <input type="hidden" name="action" value="update_profile"/>
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px; color:#667781; display:block; margin-bottom:4px;">Username</label>
-                <input type="text" name="username" value="{{ current_user.username }}"
-                       style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #e9edef; background:#f0f2f5; color:#111b21; font-size:14px; outline:none; box-sizing:border-box;"/>
-            </div>
-            <div style="margin-bottom:16px;">
-                <label style="font-size:12px; color:#667781; display:block; margin-bottom:4px;">Bio <span style="color:#aaa;">(max 150 chars)</span></label>
-                <textarea name="bio" maxlength="150" rows="2"
-                          style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #e9edef; background:#f0f2f5; color:#111b21; font-size:14px; outline:none; resize:none; box-sizing:border-box;">{{ current_user.bio or '' }}</textarea>
-            </div>
-            <button type="submit"
-                    style="width:100%; padding:12px; border-radius:12px; border:none; background:linear-gradient(135deg,#128c7e,#25d366); color:#fff; font-size:14px; font-weight:600; cursor:pointer;">
-                Save Profile
-            </button>
-        </form>
-    </div>
-
-    <hr style="border:none; border-top:1px solid #e9edef; margin-bottom:24px;"/>
-
-    <!-- Update Email Form -->
-    <div style="margin-bottom:24px;">
-        <h3 style="font-size:14px; font-weight:600; color:#667781; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Change Email</h3>
-        <form method="POST" action="/profile">
-            <input type="hidden" name="action" value="update_email"/>
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px; color:#667781; display:block; margin-bottom:4px;">New Email</label>
-                <input type="email" name="email" value="{{ current_user.email }}"
-                       style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #e9edef; background:#f0f2f5; color:#111b21; font-size:14px; outline:none; box-sizing:border-box;"/>
-            </div>
-            <div style="margin-bottom:16px;">
-                <label style="font-size:12px; color:#667781; display:block; margin-bottom:4px;">Current Password</label>
-                <input type="password" name="current_password_email" placeholder="Verify karo..."
-                       style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #e9edef; background:#f0f2f5; color:#111b21; font-size:14px; outline:none; box-sizing:border-box;"/>
-            </div>
-            <button type="submit"
-                    style="width:100%; padding:12px; border-radius:12px; border:none; background:linear-gradient(135deg,#128c7e,#25d366); color:#fff; font-size:14px; font-weight:600; cursor:pointer;">
-                Update Email
-            </button>
-        </form>
-    </div>
-
-    <hr style="border:none; border-top:1px solid #e9edef; margin-bottom:24px;"/>
-
-    <!-- Update Password Form -->
-    <div style="margin-bottom:24px;">
-        <h3 style="font-size:14px; font-weight:600; color:#667781; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px;">Change Password</h3>
-        <form method="POST" action="/profile">
-            <input type="hidden" name="action" value="update_password"/>
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px; color:#667781; display:block; margin-bottom:4px;">Current Password</label>
-                <input type="password" name="old_password" placeholder="Current password..."
-                       style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #e9edef; background:#f0f2f5; color:#111b21; font-size:14px; outline:none; box-sizing:border-box;"/>
-            </div>
-            <div style="margin-bottom:12px;">
-                <label style="font-size:12px; color:#667781; display:block; margin-bottom:4px;">New Password</label>
-                <input type="password" name="new_password" placeholder="New password..."
-                       style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #e9edef; background:#f0f2f5; color:#111b21; font-size:14px; outline:none; box-sizing:border-box;"/>
-            </div>
-            <div style="margin-bottom:16px;">
-                <label style="font-size:12px; color:#667781; display:block; margin-bottom:4px;">Confirm New Password</label>
-                <input type="password" name="confirm_password" placeholder="Confirm password..."
-                       style="width:100%; padding:12px 16px; border-radius:12px; border:1px solid #e9edef; background:#f0f2f5; color:#111b21; font-size:14px; outline:none; box-sizing:border-box;"/>
-            </div>
-            <button type="submit"
-                    style="width:100%; padding:12px; border-radius:12px; border:none; background:linear-gradient(135deg,#128c7e,#25d366); color:#fff; font-size:14px; font-weight:600; cursor:pointer;">
-                Update Password
-            </button>
-        </form>
-    </div>
-
 </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-// ── Avatar Upload ──
-document.getElementById('profile-avatar-input')?.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 2000000) {
-        alert('Image 2MB se badi nahi honi chahiye!');
-        return;
-    }
-    const status = document.getElementById('upload-status');
-    status.textContent = 'Uploading...';
-
-    const formData = new FormData();
-    formData.append('avatar', file);
-
-    fetch('/upload_avatar', { method: 'POST', body: formData })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            status.textContent = 'DP updated! ✅';
-            const existingText = document.getElementById('profile-avatar-text');
-            const existingImg = document.getElementById('profile-avatar-img');
-            if (existingText) {
-                existingText.outerHTML = `<img src="${data.avatar_url}" id="profile-avatar-img" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #25d366;"/>`;
-            } else if (existingImg) {
-                existingImg.src = data.avatar_url;
-            }
-        } else {
-            status.textContent = 'Upload failed!';
+    $('#avatar-upload').change(function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#avatar-preview').attr('src', e.target.result);
+            };
+            reader.readAsDataURL(file);
         }
-        e.target.value = '';
     });
-});
+    
+    $.get('/get_friend_count', function(data) {
+        $('#friend-count').text(data.count);
+    });
 </script>
 {% endblock %}

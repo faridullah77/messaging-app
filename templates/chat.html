@@ -1,92 +1,791 @@
 {% extends "base.html" %}
+
 {% block title %}Chat with {{ friend.username }}{% endblock %}
 
-{% block content %}
-<div class="chat-area">
+{% block extra_head %}
+<meta name="friend-id" content="{{ friend.id }}">
+<meta name="friend-username" content="{{ friend.username }}">
+<meta name="current-user-id" content="{{ current_user.id }}">
+<style>
+    .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background-color: #f0f2f5;
+    }
     
-    <div class="chat-sidebar-top">
-        <a href="/friends" class="chat-back-btn">← Back</a>
+    .chat-header {
+        background: white;
+        padding: 15px;
+        border-bottom: 1px solid #e4e6eb;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .message {
+        display: flex;
+        gap: 8px;
+        max-width: 70%;
+        position: relative;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .message-sent {
+        align-self: flex-end;
+        flex-direction: row-reverse;
+    }
+    
+    .message-received {
+        align-self: flex-start;
+    }
+    
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        object-fit: cover;
+    }
+    
+    .message-bubble {
+        background: white;
+        padding: 8px 12px;
+        border-radius: 18px;
+        position: relative;
+        word-wrap: break-word;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        max-width: 100%;
+    }
+    
+    .message-sent .message-bubble {
+        background: #0084ff;
+        color: white;
+    }
+    
+    .message-text {
+        margin-bottom: 4px;
+        word-break: break-word;
+    }
+    
+    .message-image {
+        max-width: 250px;
+        max-height: 250px;
+        border-radius: 12px;
+        cursor: pointer;
+        object-fit: cover;
+    }
+    
+    .message-time {
+        font-size: 11px;
+        opacity: 0.7;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        justify-content: flex-end;
+    }
+    
+    .message-actions {
+        position: absolute;
+        top: -25px;
+        right: 0;
+        background: white;
+        border-radius: 20px;
+        padding: 4px;
+        display: none;
+        gap: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        z-index: 10;
+    }
+    
+    .message:hover .message-actions {
+        display: flex;
+    }
+    
+    .message-sent .message-actions {
+        left: 0;
+        right: auto;
+    }
+    
+    .chat-input-area {
+        background: white;
+        padding: 15px;
+        border-top: 1px solid #e4e6eb;
+        position: sticky;
+        bottom: 0;
+    }
+    
+    .typing-indicator {
+        padding: 5px 10px;
+        font-size: 12px;
+        color: #65676b;
+        font-style: italic;
+    }
+    
+    .message-reaction {
+        font-size: 14px;
+        margin-left: 5px;
+        cursor: pointer;
+    }
+    
+    .fa-check-double {
+        font-size: 11px;
+        margin-left: 4px;
+    }
+    
+    /* Loading animation */
+    .loading-messages {
+        text-align: center;
+        padding: 50px;
+        color: #65676b;
+    }
+    
+    /* Scrollbar styling */
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .message {
+            max-width: 85%;
+        }
         
-        <div class="active-friend-compact">
-            <div class="avatar-wrapper">
-                {% if friend.avatar_url %}
-                    <img src="{{ friend.avatar_url }}" class="avatar-img" style="width: 40px; height: 40px;">
-                {% else %}
-                    <div class="avatar" style="width: 40px; height: 40px;">{{ friend.username[0].upper() }}</div>
-                {% endif %}
-                <div id="status-dot" style="position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #fff; background: {% if friend.is_online %}#25d366{% else %}#bbb{% endif %};"></div>
-            </div>
-            
-            <div class="friend-info">
-                <span class="friend-name">{{ friend.username }}</span>
-                <span id="user-status-text" class="friend-status-small" style="color: #667781;">
-                    {% if friend.is_online %}
-                        <b style="color: #25d366;">online</b>
-                    {% else %}
-                        last seen {{ get_last_seen_text(friend.last_seen) }}
-                    {% endif %}
-                </span>
+        .chat-messages {
+            padding: 10px;
+        }
+        
+        .message-actions {
+            top: -20px;
+        }
+        
+        .message-bubble {
+            padding: 6px 10px;
+        }
+        
+        .message-image {
+            max-width: 200px;
+            max-height: 200px;
+        }
+        
+        .chat-input-area .btn {
+            padding: 8px 12px;
+        }
+        
+        .chat-header h5 {
+            font-size: 16px;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .message {
+            max-width: 90%;
+        }
+        
+        .chat-input-area .form-control {
+            font-size: 14px;
+        }
+        
+        .chat-header img {
+            width: 35px;
+            height: 35px;
+        }
+    }
+    
+    /* Dark theme support */
+    body.theme-dark .chat-container {
+        background-color: #1a1a1a;
+    }
+    
+    body.theme-dark .chat-header,
+    body.theme-dark .chat-input-area {
+        background-color: #2d2d2d;
+        border-color: #3a3a3a;
+    }
+    
+    body.theme-dark .message-bubble {
+        background-color: #2d2d2d;
+        color: #e4e6eb;
+    }
+    
+    body.theme-dark .message-sent .message-bubble {
+        background-color: #0084ff;
+        color: white;
+    }
+    
+    body.theme-dark .message-actions {
+        background-color: #3a3a3a;
+    }
+    
+    body.theme-dark .message-actions .btn {
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <div class="d-flex align-items-center">
+            <img src="{{ friend.avatar_url or 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg' }}" 
+                 class="rounded-circle me-2" width="40" height="40" style="object-fit: cover;">
+            <div>
+                <h5 class="mb-0">{{ friend.username }}</h5>
+                <small class="text-muted" id="online-status">
+                    {% if friend.is_online %}🟢 Online{% else %}Last seen {{ get_last_seen_text(friend.last_seen) }}{% endif %}
+                </small>
             </div>
         </div>
-
-        <div class="chat-action-btns">
-            <button class="chat-action-btn" onclick="showStats()">📊</button>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleTheme()" title="Toggle Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="changeWallpaper()" title="Change Wallpaper">
+                <i class="fas fa-image"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="showStats()" title="Chat Statistics">
+                <i class="fas fa-chart-bar"></i>
+            </button>
         </div>
     </div>
-
-    <div class="messages-container" id="messages-container">
-        {% for msg in messages %}
-            <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %}" data-msg-id="{{ msg.id }}">
-                <div class="message-bubble" id="bubble-{{ msg.id }}">
-                    <p style="margin:0;">{{ msg.content }}</p>
-                    <div class="message-meta" style="justify-content: flex-end; display: flex; align-items: center; gap: 4px; margin-top: 2px;">
-                        <span class="message-time">{{ msg.timestamp.strftime('%H:%M') }}</span>
-                        {% if msg.sender_id == current_user.id %}
-                            <span class="tick {% if msg.is_read %}seen{% endif %}" id="tick-{{ msg.id }}" style="color: {% if msg.is_read %}#34b7f1{% else %}#bbb{% endif %};">
-                                {% if msg.is_read %}✓✓{% else %}✓{% endif %}
-                            </span>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
-        <div id="scroll-anchor"></div>
-    </div>
-
-    <div class="input-area">
-        <div style="flex: 1; background: #fff; border-radius: 24px; padding: 2px 12px; display: flex; align-items: center;">
-            <textarea id="message-input" placeholder="Type a message..." rows="1" 
-                      style="width: 100%; border: none; outline: none; padding: 10px; font-size: 16px; resize: none;"></textarea>
+    
+    <div class="chat-messages" id="chat-messages">
+        <div class="loading-messages" id="loading-messages">
+            <i class="fas fa-spinner fa-spin"></i> Loading messages...
         </div>
-        <button id="send-btn">➤</button>
+    </div>
+    
+    <div class="chat-input-area">
+        <div class="typing-indicator" id="typing-indicator" style="display: none;">
+            <small><span id="typing-user"></span> is typing...</small>
+        </div>
+        <div class="input-group">
+            <button class="btn btn-outline-secondary" onclick="uploadImage()" title="Send Image">
+                <i class="fas fa-image"></i>
+            </button>
+            <input type="text" class="form-control" id="message-input" 
+                   placeholder="Type a message..." autocomplete="off">
+            <button class="btn btn-primary" onclick="sendMessage()" title="Send Message">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+        <div class="mt-2">
+            <label class="small">
+                <input type="checkbox" id="view-once"> View Once (image only)
+            </label>
+        </div>
     </div>
 </div>
 
-<script>
-    // Define global variables
-    window.FRIEND_ID = {{ friend.id }};
-    window.CURRENT_USER_ID = {{ current_user.id }};
-    
-    // Scroll to bottom
-    const container = document.getElementById('messages-container');
-    if (container) container.scrollTop = container.scrollHeight;
+<input type="file" id="image-upload" accept="image/*" style="display: none;">
+{% endblock %}
 
-    // Socket status listener
-    if (typeof socket !== 'undefined') {
-        socket.on('user_status_change', function(data) {
-            if (data.user_id == {{ friend.id }}) {
-                const statusText = document.getElementById('user-status-text');
-                const statusDot = document.getElementById('status-dot');
-                if (data.online) {
-                    statusText.innerHTML = '<b style="color: #25d366;">online</b>';
-                    statusDot.style.background = "#25d366";
+{% block scripts %}
+<script>
+    // Get friend and user IDs from meta tags
+    const FRIEND_ID = parseInt(document.querySelector('meta[name="friend-id"]').getAttribute('content'));
+    const FRIEND_USERNAME = document.querySelector('meta[name="friend-username"]').getAttribute('content');
+    const CURRENT_USER_ID = parseInt(document.querySelector('meta[name="current-user-id"]').getAttribute('content'));
+    
+    let selectedImage = null;
+    let typingTimeout;
+    let messageIds = new Set(); // Track loaded message IDs to avoid duplicates
+    
+    // Initialize Socket.IO with proper configuration for Railway
+    var socket = io('https://asmafarid.up.railway.app', {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 20000
+    });
+    
+    // Socket connection handlers
+    socket.on('connect', function() {
+        console.log('✅ Socket.IO connected successfully');
+    });
+    
+    socket.on('disconnect', function() {
+        console.log('❌ Socket.IO disconnected');
+    });
+    
+    socket.on('connect_error', function(error) {
+        console.error('Socket.IO connection error:', error);
+    });
+    
+    // Load messages on page load
+    $(document).ready(function() {
+        loadMessages();
+        
+        // Handle Enter key for sending messages
+        $('#message-input').on('keypress', function(e) {
+            if (e.which === 13 && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        // Typing indicator
+        $('#message-input').on('input', function() {
+            socket.emit('typing', {
+                receiver_id: FRIEND_ID
+            });
+            
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('stop_typing', {
+                    receiver_id: FRIEND_ID
+                });
+            }, 1000);
+        });
+        
+        // Focus on input field
+        $('#message-input').focus();
+    });
+    
+    function loadMessages() {
+        $.get(`/get_messages/${FRIEND_ID}`)
+            .done(function(messages) {
+                $('#loading-messages').hide();
+                if (messages.length === 0) {
+                    $('#chat-messages').append('<div class="text-center text-muted py-5">✨ No messages yet. Say hi! ✨</div>');
                 } else {
-                    statusText.innerText = 'offline';
-                    statusDot.style.background = "#bbb";
+                    messages.forEach(msg => {
+                        if (!messageIds.has(msg.id)) {
+                            displayMessage(msg);
+                            messageIds.add(msg.id);
+                        }
+                    });
                 }
+                scrollToBottom();
+            })
+            .fail(function(error) {
+                console.error('Failed to load messages:', error);
+                $('#loading-messages').html('<div class="text-danger text-center">Failed to load messages. Please refresh the page.</div>');
+            });
+    }
+    
+    function sendMessage() {
+        const content = $('#message-input').val().trim();
+        const viewOnce = $('#view-once').is(':checked');
+        
+        if (!content && !selectedImage) {
+            return;
+        }
+        
+        if (selectedImage) {
+            // Send image message
+            const formData = new FormData();
+            formData.append('image', selectedImage);
+            formData.append('receiver_id', FRIEND_ID);
+            formData.append('view_once', viewOnce);
+            
+            $.ajax({
+                url: '/upload_image',
+                method: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(data) {
+                    if (data.success) {
+                        selectedImage = null;
+                        $('#view-once').prop('checked', false);
+                        $('#message-input').val('');
+                    } else {
+                        alert('Failed to upload image: ' + (data.error || 'Unknown error'));
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Image upload failed:', xhr);
+                    alert('Failed to upload image. Please try again.');
+                }
+            });
+        } else {
+            // Send text message via Socket.IO
+            console.log('Sending message:', content);
+            socket.emit('send_message', {
+                receiver_id: FRIEND_ID,
+                message: content,
+                reply_to_id: null
+            });
+            $('#message-input').val('');
+        }
+        
+        $('#view-once').prop('checked', false);
+    }
+    
+    function uploadImage() {
+        $('#image-upload').click();
+    }
+    
+    $('#image-upload').change(function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image size must be less than 5MB');
+                return;
+            }
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+            selectedImage = file;
+            sendMessage();
+            $('#image-upload').val(''); // Clear the input
+        }
+    });
+    
+    function displayMessage(msg) {
+        // Check if message already exists
+        if ($(`.message[data-message-id="${msg.id}"]`).length > 0) {
+            return;
+        }
+        
+        const isMine = msg.sender_id === CURRENT_USER_ID;
+        const messageClass = isMine ? 'message-sent' : 'message-received';
+        
+        // Parse image message
+        let contentHtml = '';
+        let isImage = false;
+        let imageUrl = '';
+        
+        if (msg.content && msg.content.startsWith('[IMAGE]')) {
+            isImage = true;
+            const match = msg.content.match(/\[IMAGE\](.*?)\[\/IMAGE\]/);
+            imageUrl = match ? match[1] : '';
+            if (imageUrl) {
+                contentHtml = `<img src="${imageUrl}" class="message-image" onclick="viewImage('${imageUrl}')" alt="Image">`;
+            } else {
+                contentHtml = `<div class="message-text">${escapeHtml(msg.content)}</div>`;
+            }
+        } else if (msg.content && msg.content === '[VIEW_ONCE_VIEWED]') {
+            contentHtml = `<div class="message-text text-muted"><em>🔒 View once image viewed</em></div>`;
+        } else {
+            contentHtml = `<div class="message-text">${escapeHtml(msg.content)}</div>`;
+        }
+        
+        const timeString = msg.timestamp || (msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '');
+        
+        const messageHtml = `
+            <div class="message ${messageClass}" data-message-id="${msg.id}" data-sender-id="${msg.sender_id}">
+                ${!isMine ? `<img src="${msg.sender_avatar || 'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg'}" class="message-avatar" alt="Avatar">` : ''}
+                <div class="message-bubble">
+                    ${contentHtml}
+                    <div class="message-time">
+                        ${timeString}
+                        ${msg.is_edited ? '<small>(edited)</small>' : ''}
+                        ${msg.reaction ? `<span class="message-reaction">${msg.reaction}</span>` : ''}
+                        ${!isMine && msg.is_read ? '<i class="fas fa-check-double"></i>' : ''}
+                        ${isMine ? '<i class="fas fa-check"></i>' : ''}
+                    </div>
+                </div>
+                ${isMine ? `
+                    <div class="message-actions">
+                        <button class="btn btn-sm" onclick="editMessage(${msg.id})" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm" onclick="deleteMessage(${msg.id})" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                ` : `
+                    <div class="message-actions">
+                        <button class="btn btn-sm" onclick="reactToMessage(${msg.id}, '👍')" title="Like">👍</button>
+                        <button class="btn btn-sm" onclick="reactToMessage(${msg.id}, '❤️')" title="Love">❤️</button>
+                        <button class="btn btn-sm" onclick="reactToMessage(${msg.id}, '😂')" title="Haha">😂</button>
+                        <button class="btn btn-sm" onclick="reactToMessage(${msg.id}, '😮')" title="Wow">😮</button>
+                    </div>
+                `}
+            </div>
+        `;
+        
+        $('#chat-messages').append(messageHtml);
+        scrollToBottom();
+        
+        // Mark message as seen if I'm the receiver
+        if (!isMine && !msg.is_read) {
+            socket.emit('message_seen', {msg_id: msg.id});
+        }
+    }
+    
+    function scrollToBottom() {
+        const messagesDiv = document.getElementById('chat-messages');
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function viewImage(url) {
+        window.open(url, '_blank');
+    }
+    
+    function reactToMessage(messageId, reaction) {
+        $.ajax({
+            url: `/react/${messageId}`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({emoji: reaction}),
+            success: function(data) {
+                if (data.success) {
+                    const messageDiv = $(`.message[data-message-id="${messageId}"]`);
+                    if (data.action === 'added') {
+                        if (messageDiv.find('.message-reaction').length) {
+                            messageDiv.find('.message-reaction').text(reaction);
+                        } else {
+                            messageDiv.find('.message-time').append(`<span class="message-reaction">${reaction}</span>`);
+                        }
+                    } else {
+                        messageDiv.find('.message-reaction').remove();
+                    }
+                }
+            },
+            error: function(xhr) {
+                console.error('Failed to add reaction:', xhr);
             }
         });
     }
+    
+    function editMessage(messageId) {
+        const currentText = $(`.message[data-message-id="${messageId}"] .message-text`).text();
+        const newContent = prompt('Edit message:', currentText);
+        if (newContent && newContent.trim() && newContent !== currentText) {
+            $.ajax({
+                url: `/edit_message/${messageId}`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({content: newContent.trim()}),
+                success: function(data) {
+                    if (data.success) {
+                        const messageDiv = $(`.message[data-message-id="${messageId}"]`);
+                        messageDiv.find('.message-text').text(newContent);
+                        if (!messageDiv.find('.message-time small').length) {
+                            messageDiv.find('.message-time').prepend('<small>(edited)</small> ');
+                        }
+                    } else {
+                        alert('Failed to edit message');
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Failed to edit message:', xhr);
+                    alert('Failed to edit message');
+                }
+            });
+        }
+    }
+    
+    function deleteMessage(messageId) {
+        const deleteForEveryone = confirm('Delete for everyone? Click OK for everyone, Cancel for just you');
+        $.ajax({
+            url: `/delete_message/${messageId}`,
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({delete_for: deleteForEveryone ? 'everyone' : 'me'}),
+            success: function(data) {
+                if (data.success) {
+                    $(`.message[data-message-id="${messageId}"]`).fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                }
+            },
+            error: function(xhr) {
+                console.error('Failed to delete message:', xhr);
+                alert('Failed to delete message');
+            }
+        });
+    }
+    
+    function changeWallpaper() {
+        const wallpaperUrl = prompt('Enter wallpaper URL (e.g., https://images.unsplash.com/...):');
+        if (wallpaperUrl) {
+            $.ajax({
+                url: `/set_wallpaper/${FRIEND_ID}`,
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({wallpaper: wallpaperUrl}),
+                success: function() {
+                    $('.chat-container').css({
+                        'background-image': `url(${wallpaperUrl})`,
+                        'background-size': 'cover',
+                        'background-position': 'center',
+                        'background-repeat': 'no-repeat'
+                    });
+                },
+                error: function() {
+                    alert('Failed to set wallpaper');
+                }
+            });
+        }
+    }
+    
+    function showStats() {
+        $.get(`/stats/${FRIEND_ID}`, function(data) {
+            alert(`📊 Chat Statistics with ${data.friend_username}:\n\n` +
+                  `📤 Messages Sent: ${data.sent}\n` +
+                  `📥 Messages Received: ${data.received}\n` +
+                  `💬 Total Messages: ${data.total}\n` +
+                  `🖼️ Images Sent: ${data.sent_images}\n` +
+                  `🖼️ Images Received: ${data.received_images}\n` +
+                  `📅 Days Chatting: ${data.days_chatting}`);
+        }).fail(function() {
+            alert('Failed to load statistics');
+        });
+    }
+    
+    function toggleTheme() {
+        const currentTheme = document.body.classList.contains('theme-light') ? 'light' : 'dark';
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        document.body.classList.remove(`theme-${currentTheme}`);
+        document.body.classList.add(`theme-${newTheme}`);
+        $.post('/update_theme', {theme: newTheme});
+    }
+    
+    // Socket.IO event handlers
+    socket.on('receive_message', function(data) {
+        console.log('📨 New message received:', data);
+        
+        // Check if message is for this chat
+        if (data.sender_id === FRIEND_ID || data.sender_id === CURRENT_USER_ID) {
+            const messageData = {
+                id: data.msg_id,
+                sender_id: data.sender_id,
+                content: data.message,
+                timestamp: data.timestamp,
+                created_at: new Date().toISOString(),
+                sender_username: data.sender,
+                sender_avatar: data.sender_avatar,
+                is_edited: false,
+                is_read: false
+            };
+            
+            // Check if message already exists
+            if (!messageIds.has(data.msg_id)) {
+                displayMessage(messageData);
+                messageIds.add(data.msg_id);
+                
+                // Scroll to bottom
+                scrollToBottom();
+            }
+        }
+    });
+    
+    socket.on('message_edited', function(data) {
+        console.log('✏️ Message edited:', data);
+        const messageDiv = $(`.message[data-message-id="${data.msg_id}"]`);
+        if (messageDiv.length) {
+            messageDiv.find('.message-text').text(data.new_content);
+            if (!messageDiv.find('.message-time small').length) {
+                messageDiv.find('.message-time').prepend('<small>(edited)</small> ');
+            }
+        }
+    });
+    
+    socket.on('message_deleted', function(data) {
+        console.log('🗑️ Message deleted:', data);
+        $(`.message[data-message-id="${data.msg_id}"]`).fadeOut(300, function() {
+            $(this).remove();
+        });
+    });
+    
+    socket.on('message_read', function(data) {
+        console.log('👁️ Message read:', data);
+        const messageDiv = $(`.message[data-message-id="${data.msg_id}"]`);
+        if (messageDiv.length) {
+            const timeDiv = messageDiv.find('.message-time');
+            if (timeDiv.find('.fa-check-double').length === 0) {
+                timeDiv.append('<i class="fas fa-check-double"></i>');
+            }
+        }
+    });
+    
+    socket.on('reaction_updated', function(data) {
+        console.log('😊 Reaction updated:', data);
+        const messageDiv = $(`.message[data-message-id="${data.msg_id}"]`);
+        if (messageDiv.length) {
+            messageDiv.find('.message-reaction').remove();
+            const reactions = data.reactions;
+            for (let emoji in reactions) {
+                const count = reactions[emoji];
+                const displayEmoji = count > 1 ? `${emoji}${count}` : emoji;
+                messageDiv.find('.message-time').append(`<span class="message-reaction">${displayEmoji}</span>`);
+            }
+        }
+    });
+    
+    socket.on('user_typing', function(data) {
+        if (data.sender_id === FRIEND_ID) {
+            $('#typing-user').text(data.sender);
+            $('#typing-indicator').fadeIn();
+        }
+    });
+    
+    socket.on('user_stop_typing', function(data) {
+        if (data.sender_id === FRIEND_ID) {
+            $('#typing-indicator').fadeOut();
+        }
+    });
+    
+    socket.on('user_status', function(data) {
+        if (data.user_id === FRIEND_ID) {
+            if (data.status === 'online') {
+                $('#online-status').html('🟢 Online');
+            } else {
+                $('#online-status').html('⚫ Offline');
+            }
+        }
+    });
+    
+    socket.on('view_once_viewed', function(data) {
+        console.log('👁️ View once image viewed:', data);
+        const messageDiv = $(`.message[data-message-id="${data.msg_id}"]`);
+        if (messageDiv.length) {
+            messageDiv.find('.message-image').replaceWith(
+                '<div class="message-text text-muted"><em>🔒 View once image viewed</em></div>'
+            );
+        }
+    });
+    
+    // Refresh messages when reconnected
+    socket.on('reconnect', function() {
+        console.log('Reconnected, refreshing messages...');
+        loadMessages();
+    });
 </script>
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
