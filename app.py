@@ -191,21 +191,31 @@ def chat(friend_id):
     friend = User.query.get_or_404(friend_id)
     if not current_user.is_friend_with(friend):
         return redirect(url_for('friends'))
-    Message.query.filter_by(
+
+    # Mark all messages from this friend as READ when I open the chat
+    unread_messages = Message.query.filter_by(
         sender_id=friend_id,
         receiver_id=current_user.id,
         is_read=False
-    ).update({'is_read': True})
-    db.session.commit()
+    ).all()
+
+    if unread_messages:
+        for msg in unread_messages:
+            msg.is_read = True
+            msg.read_at = datetime.utcnow()
+            # Notify the sender that I've read their messages
+            socketio.emit('message_read', {
+                'msg_id': msg.id,
+                'read_at': msg.read_at.isoformat()
+            }, room=f'user_{friend_id}')
+        db.session.commit()
+
     messages = Message.query.filter(
         ((Message.sender_id == current_user.id) & (Message.receiver_id == friend_id)) |
         ((Message.sender_id == friend_id) & (Message.receiver_id == current_user.id))
     ).order_by(Message.timestamp.asc()).all()
-    return render_template('chat.html',
-                           friend=friend,
-                           messages=messages,
-                           current_user=current_user)
 
+    return render_template('chat.html', friend=friend, messages=messages)
 # ── Search Messages ──
 @app.route('/search_messages/<int:friend_id>')
 @login_required
@@ -597,6 +607,30 @@ def message_stats(friend_id):
         'days_chatting': days_chatting,
         'friend_username': friend.username
     })
+from datetime import datetime, timedelta
+
+def get_last_seen_text(last_seen_time):
+    if not last_seen_time:
+        return "Offline"
+    
+    now = datetime.utcnow()
+    diff = now - last_seen_time
+
+    if diff < timedelta(minutes=1):
+        return "Just now"
+    if diff < timedelta(hours=1):
+        return f"{int(diff.seconds / 60)}m ago"
+    if diff < timedelta(days=1):
+        return f"{int(diff.seconds / 3600)}h ago"
+    if diff < timedelta(days=2):
+        return "Yesterday"
+    
+    return last_seen_time.strftime('%b %d')
+
+# Make this function available in your Jinja2 templates
+@app.context_processor
+def utility_processor():
+    return dict(get_last_seen_text=get_last_seen_text)
 # ── Socket Events ──
 @socketio.on('connect')
 def handle_connect():

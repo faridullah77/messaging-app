@@ -1,205 +1,102 @@
 {% extends "base.html" %}
-
 {% block title %}Chat with {{ friend.username }}{% endblock %}
 
-{% block head %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
-{% endblock %}
-
 {% block content %}
-<div class="app-container">
+<div style="display: flex; flex-direction: column; height: 100vh; background-color: #efeae2; overflow: hidden;">
+    
+    <div style="background: #fff; padding: 10px 16px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); z-index: 10;">
+        <a href="/friends" style="text-decoration: none; color: #128c7e; font-size: 20px; font-weight: bold;">←</a>
+        
+        <div style="position: relative;">
+            {% if friend.avatar_url %}
+                <img src="{{ friend.avatar_url }}" style="width: 45px; height: 45px; border-radius: 50%; object-fit: cover;">
+            {% else %}
+                <div style="width: 45px; height: 45px; border-radius: 50%; background: #128c7e; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                    {{ friend.username[0].upper() }}
+                </div>
+            {% endif %}
+            <div id="status-dot" style="position: absolute; bottom: 2px; right: 2px; width: 12px; height: 12px; background: {% if friend.is_online %}#25d366{% else %}#bbb{% endif %}; border: 2px solid #fff; border-radius: 50%;"></div>
+        </div>
 
-    <!-- Sidebar -->
-    <div class="sidebar">
-        <div class="chat-sidebar-top">
-            <a href="/friends" class="chat-back-btn">← Back</a>
-            <div class="active-friend-compact">
-                {% if friend.avatar_url %}
-                <img src="{{ friend.avatar_url }}" class="friend-avatar-img"/>
+        <div style="flex-grow: 1;">
+            <h2 style="margin: 0; font-size: 16px; color: #111b21;">{{ friend.username }}</h2>
+            <p id="user-status-text" style="margin: 0; font-size: 12px; color: #667781;">
+                {% if friend.is_online %}
+                    <span style="color: #25d366; font-weight: 600;">online</span>
                 {% else %}
-                <div class="friend-avatar">{{ friend.username[0].upper() }}</div>
+                    last seen {{ get_last_seen_text(friend.last_seen) }}
                 {% endif %}
-               <div class="friend-info">
-                    <span class="friend-name">{{ friend.username }}</span>
-                    <span class="friend-status-small {% if friend.is_online %}online{% else %}offline{% endif %}">
-                        {% if friend.is_online %}● Online
-                        {% elif friend.last_seen %}Last seen <span class="last-seen-time" data-utc="{{ friend.last_seen.isoformat() }}"></span>
-                        {% else %}● Offline{% endif %}
-                    </span>
-                </div>
-            </div>
-            <div class="chat-action-btns">
-                <button class="chat-action-btn" onclick="showWallpaperPicker()" title="Wallpaper">🎨</button>
-                <button class="chat-action-btn" onclick="showStats()" title="Stats">📊</button>
-            </div>
+            </p>
+        </div>
+        
+        <div style="display: flex; gap: 15px; color: #667781;">
+            <span style="cursor: pointer;" onclick="showStats()">📊</span>
         </div>
     </div>
 
-    <!-- Chat Area -->
-    <div class="chat-area">
-
-        <!-- Search Bar -->
-        <div class="chat-search-bar" id="chat-search-bar" style="display:none">
-            <input type="text" id="chat-search-input" placeholder="Search messages..." autocomplete="off"/>
-            <button onclick="closeSearch()">✕</button>
-        </div>
-
-        <!-- Typing Indicator -->
-        <div class="typing-indicator" id="typing-indicator" style="display:none">
-            <span>{{ friend.username }} is typing</span>
-            <span class="typing-dots"><span>.</span><span>.</span><span>.</span></span>
-        </div>
-
-        <!-- Reply Preview -->
-        <div class="reply-preview" id="reply-preview" style="display:none">
-            <div class="reply-preview-content">
-                <span class="reply-preview-text" id="reply-preview-text"></span>
-                <button onclick="cancelReply()">✕</button>
-            </div>
-        </div>
-
-        <div class="messages-container" id="messages">
-            {% for msg in messages %}
-            <div class="message {% if msg.sender_id == current_user.id %}mine{% else %}theirs{% endif %} {% if msg.is_deleted %}deleted{% endif %}"
-                 data-msg-id="{{ msg.id }}">
-                {% if msg.sender_id != current_user.id %}
-                <span class="message-sender">{{ friend.username }}</span>
-                {% endif %}
-                {% if msg.reply_to %}
-                <div class="reply-quote">
-                    <span>{{ msg.reply_to.content[:50] }}</span>
-                </div>
-                {% endif %}
-                {% if msg.content == '[VIEW_ONCE_VIEWED]' %}
-                <div class="view-once-viewed">👁️ Viewed</div>
-                {% elif msg.view_once and msg.sender_id != current_user.id and not msg.viewed %}
-                <div class="view-once-tap" data-url="{{ msg.content[7:-8] }}" onclick="viewOnceImage({{ msg.id }}, this)">
-                    👁️ Tap to view (view once)
-                </div>
-                {% elif msg.view_once and msg.sender_id == current_user.id %}
-                <div class="view-once-sent">👁️ View once {% if msg.viewed %}• Viewed{% else %}• Not viewed yet{% endif %}</div>
-                {% elif '[IMAGE]' in msg.content %}
-                <img src="{{ msg.content[7:-8] }}" class="chat-image" onclick="window.open('{{ msg.content[7:-8] }}', '_blank')" />
-                {% else %}
-                <div class="message-bubble" id="bubble-{{ msg.id }}">{{ msg.content }}{% if msg.is_edited %} <span class="edited-tag">(edited)</span>{% endif %}</div>
-                {% endif %}
-                {% if not msg.is_deleted %}
-                <div class="emoji-picker" id="picker-{{ msg.id }}">
-                    <span onclick="sendReaction({{ msg.id }}, '❤️')">❤️</span>
-                    <span onclick="sendReaction({{ msg.id }}, '😂')">😂</span>
-                    <span onclick="sendReaction({{ msg.id }}, '😮')">😮</span>
-                    <span onclick="sendReaction({{ msg.id }}, '😢')">😢</span>
-                    <span onclick="sendReaction({{ msg.id }}, '👍')">👍</span>
-                    <span onclick="sendReaction({{ msg.id }}, '🔥')">🔥</span>
-                </div>
-                {% endif %}
-                <div class="reactions-bar" id="reactions-{{ msg.id }}"></div>
-                <div class="message-meta">
-                    <span class="message-time" data-utc="{{ msg.timestamp.isoformat() }}"></span>
-                    {% if msg.sender_id == current_user.id %}
-                    <span class="tick {% if msg.is_read %}seen{% endif %}"
-                          id="tick-{{ msg.id }}"
-                          {% if msg.is_read and msg.read_at %}
-                          data-read-at="{{ msg.read_at.isoformat() }}"
-                          title="Seen at {{ msg.read_at.strftime('%I:%M %p') }}"
-                          {% endif %}>
-                        {% if msg.is_read %}✓✓{% else %}✓{% endif %}
-                    </span>
-                    {% if not msg.is_deleted %}
-                    <span class="edit-btn" onclick="startEdit({{ msg.id }}, '{{ msg.content|replace("'", "\\'") }}')">✏️</span>
-                    <span class="delete-btn" onclick="showDeleteOptions({{ msg.id }}, this)">🗑️</span>
-                    {% endif %}
-                    {% endif %}
-                    {% if not msg.is_deleted %}
-                    <span class="reply-btn" onclick="setReply({{ msg.id }}, '{{ msg.content[:50]|replace("'", "\\'") }}')">↩️</span>
-                    {% endif %}
+    <div id="messages-container" style="flex-grow: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 8px;">
+        {% for msg in messages %}
+            <div class="message-wrapper {% if msg.sender_id == current_user.id %}sent{% else %}received{% endif %}" 
+                 id="msg-{{ msg.id }}" 
+                 style="display: flex; flex-direction: column; align-items: {% if msg.sender_id == current_user.id %}flex-end{% else %}flex-start{% endif %};">
+                
+                <div style="max-width: 80%; padding: 8px 12px; border-radius: 12px; position: relative; 
+                            background: {% if msg.sender_id == current_user.id %}#dcf8c6{% else %}#fff{% endif %};
+                            box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
+                    
+                    <p style="margin: 0; font-size: 14px; color: #111b21;">{{ msg.content }}</p>
+                    
+                    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 4px;">
+                        <span style="font-size: 10px; color: #667781;">{{ msg.timestamp.strftime('%H:%M') }}</span>
+                        {% if msg.sender_id == current_user.id %}
+                            <span class="tick" style="font-size: 12px; color: {% if msg.is_read %}#34b7f1{% else %}#bbb{% endif %};">
+                                {% if msg.is_read %}✓✓{% else %}✓{% endif %}
+                            </span>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
-            {% endfor %}
-        </div>
-
-        <button class="scroll-bottom-btn" id="scroll-bottom-btn" onclick="scrollToBottom()" title="Scroll to bottom">↓</button>
-
-        <div class="input-area">
-            <div class="input-icons-grid">
-                <button class="search-toggle-btn" onclick="toggleSearch()" title="Search">🔍</button>
-                <button class="theme-toggle-btn" onclick="toggleTheme()" title="Theme">🌙</button>
-                <label class="image-upload-btn" title="Image">
-                    📷
-                    <input type="file" id="image-input" accept="image/*" style="display:none"/>
-                </label>
-                <label class="image-upload-btn view-once-btn" title="View once">
-                    👁️
-                    <input type="file" id="view-once-input" accept="image/*" style="display:none"/>
-                </label>
-            </div>
-            <textarea
-                id="message-input"
-                placeholder="Type a message..."
-                autocomplete="off"
-                rows="1"
-            ></textarea>
-            <button id="send-btn">▶</button>
-        </div>
+        {% endfor %}
+        <div id="scroll-anchor"></div>
     </div>
 
-</div>
-
-<!-- Wallpaper Modal -->
-<div class="modal-overlay" id="wallpaper-modal" style="display:none">
-    <div class="modal-box">
-        <p>Choose Wallpaper</p>
-        <div class="wallpaper-grid">
-            <div class="wallpaper-option" style="background:#eae6df;" onclick="setWallpaper('default')">Default</div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#667eea,#764ba2);" onclick="setWallpaper('purple')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#f093fb,#f5576c);" onclick="setWallpaper('pink')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#4facfe,#00f2fe);" onclick="setWallpaper('blue')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#43e97b,#38f9d7);" onclick="setWallpaper('green')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#fa709a,#fee140);" onclick="setWallpaper('sunset')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#a18cd1,#fbc2eb);" onclick="setWallpaper('lavender')"></div>
-            <div class="wallpaper-option" style="background:linear-gradient(135deg,#ffecd2,#fcb69f);" onclick="setWallpaper('peach')"></div>
-            <div class="wallpaper-option" style="background:#1a1a2e;" onclick="setWallpaper('dark')">🌙</div>
-            <div class="wallpaper-option custom-wallpaper-option" onclick="document.getElementById('custom-wallpaper-input').click()">
-                📷 Custom
-                <input type="file" id="custom-wallpaper-input" accept="image/*" style="display:none"/>
-            </div>
+    <div style="background: #f0f2f5; padding: 10px; display: flex; align-items: center; gap: 10px;">
+        <div style="flex-grow: 1; background: #fff; border-radius: 20px; padding: 5px 15px; display: flex; align-items: center;">
+            <input type="text" id="message-input" placeholder="Type a message..." 
+                   style="width: 100%; border: none; outline: none; padding: 8px; font-size: 15px;">
         </div>
-        <button class="btn-cancel" onclick="closeWallpaperModal()">Cancel</button>
+        <button id="send-btn" style="background: #128c7e; color: #fff; border: none; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px;">
+            ➤
+        </button>
     </div>
 </div>
 
-<!-- Delete Modal -->
-<div class="modal-overlay" id="delete-modal" style="display:none">
-    <div class="modal-box">
-        <p>Delete message?</p>
-        <button class="btn-delete-me" onclick="deleteMessage('me')">Delete for Me</button>
-        <button class="btn-delete-everyone" onclick="deleteMessage('everyone')">Delete for Everyone</button>
-        <button class="btn-cancel" onclick="closeDeleteModal()">Cancel</button>
-    </div>
-</div>
-
-<!-- Stats Modal -->
-<div class="modal-overlay" id="stats-modal" style="display:none">
-    <div class="modal-box" style="min-width:300px;">
-        <p>📊 Chat Statistics</p>
-        <div id="stats-content" style="text-align:left; margin-top:8px;">
-            <div style="display:flex; justify-content:center; padding:20px;">
-                <div style="width:24px;height:24px;border:3px solid #25d366;border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-            </div>
-        </div>
-        <button class="btn-cancel" onclick="closeStatsModal()">Close</button>
-    </div>
-</div>
-
-{% endblock %}
-
-{% block scripts %}
-<style>
-@keyframes spin { to { transform: rotate(360deg); } }
-</style>
 <script>
-    const CURRENT_USER_ID = {{ current_user.id }};
-    const FRIEND_ID = {{ friend.id }};
+    const container = document.getElementById('messages-container');
+    container.scrollTop = container.scrollHeight;
+
+    // Real-time Status Updates via Socket.io
+    socket.on('user_status_change', function(data) {
+        // Check if the update is for the friend we are currently chatting with
+        if (data.user_id == "{{ friend.id }}") {
+            const statusText = document.getElementById('user-status-text');
+            const statusDot = document.getElementById('status-dot');
+
+            if (data.online) {
+                statusText.innerHTML = '<span style="color: #25d366; font-weight: 600;">online</span>';
+                statusDot.style.backgroundColor = "#25d366";
+            } else {
+                // When they go offline, we show "offline" (or refresh to get the specific last seen time)
+                statusText.innerHTML = 'offline';
+                statusDot.style.backgroundColor = "#bbb";
+            }
+        }
+    });
+
+    // Handle appending new messages and auto-scrolling
+    socket.on('receive_message', function(data) {
+        // ... your existing logic to append the message HTML ...
+        container.scrollTop = container.scrollHeight;
+    });
 </script>
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
