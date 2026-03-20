@@ -63,27 +63,30 @@
 </div>
 
 <script>
-    // Define variables BEFORE loading chat.js
-    const FRIEND_ID = {{ friend.id }};
-    const CURRENT_USER_ID = {{ current_user.id }};
+    // Define global variables
+    window.FRIEND_ID = {{ friend.id }};
+    window.CURRENT_USER_ID = {{ current_user.id }};
     
+    // Scroll to bottom
     const container = document.getElementById('messages-container');
     if (container) container.scrollTop = container.scrollHeight;
 
-    // Listen for Real-time Status Changes
-    socket.on('user_status_change', function(data) {
-        if (data.user_id == {{ friend.id }}) {
-            const statusText = document.getElementById('user-status-text');
-            const statusDot = document.getElementById('status-dot');
-            if (data.online) {
-                statusText.innerHTML = '<b style="color: #25d366;">online</b>';
-                statusDot.style.background = "#25d366";
-            } else {
-                statusText.innerText = 'offline';
-                statusDot.style.background = "#bbb";
+    // Socket status listener
+    if (typeof socket !== 'undefined') {
+        socket.on('user_status_change', function(data) {
+            if (data.user_id == {{ friend.id }}) {
+                const statusText = document.getElementById('user-status-text');
+                const statusDot = document.getElementById('status-dot');
+                if (data.online) {
+                    statusText.innerHTML = '<b style="color: #25d366;">online</b>';
+                    statusDot.style.background = "#25d366";
+                } else {
+                    statusText.innerText = 'offline';
+                    statusDot.style.background = "#bbb";
+                }
             }
-        }
-    });
+        });
+    }
 </script>
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
